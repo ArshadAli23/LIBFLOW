@@ -78,16 +78,18 @@ graph TD
   - Standardized reservation state machine: `WAITING`, `READY_FOR_PICKUP`, `CLAIMED`, `EXPIRED`, `CANCELLED`.
   - Documented complete Mongoose models with tenant readiness (`tenantId: "default-library"`).
 
-- **Phase 2: Design System & Reusable Component Library (NEXT TARGET)**
-  - Scaffold Vite React 19 + TypeScript in `client/`.
-  - Configure Tailwind CSS with centralized design tokens in `client/src/styles/tokens.css`.
-  - Build universal component library supporting all 7 states (default, hover, focus, active, disabled, loading, error):
-    - UI: `Button`, `Input`, `Select`, `Textarea`, `Checkbox`, `Switch`, `Badge`, `Avatar`, `Card`, `StatCard`, `Modal`, `Dialog`, `Dropdown`, `Tooltip`.
-    - Navigation: `Breadcrumb`, `Tabs`, `Pagination`.
-    - Data Display: `DataTable`, `BookCard`.
-    - Feedback: `Toast`, `Alert`, `EmptyState`, `LoadingState`, `ErrorState`, `Skeleton`.
+- **Phase 2: Design System & Reusable Component Library (COMPLETED)**
+  - Scaffolded Vite React 19 + TypeScript client in `client/`.
+  - Configured Tailwind CSS with centralized design tokens in `client/src/styles/tokens.css`.
+  - Engineered universal UI component library supporting all 7 states (default, hover, focus, active, disabled, loading, error):
+    - UI: `Button`, `IconButton`, `ButtonGroup`, `Input`, `PasswordInput`, `SearchInput`, `Textarea`, `Select`, `Checkbox`, `Switch`, `FormField`, `Modal`, `Dropdown`, `Tooltip`.
+    - Navigation: `Sidebar`, `Header`, `Breadcrumb`, `Tabs`.
+    - Data Display: `Badge`, `StatusBadge` (14 states), `Card`, `StatCard`, `Avatar`, `AvatarGroup`, `DataRow`, `Table`, `Pagination`, `FilterChip`, `FilterButton`.
+    - Feedback: `Alert`, `ToastProvider` & `useToast`, `Spinner`, `Skeleton`, `Progress`, `EmptyState`, `ErrorState`, `LoadingState`.
+    - 3D Pipeline: `Hero3DCanvas` with WebGL detection and reduced-motion fallback.
+  - Interactive showcase routes verified: `/design-system` and `/dashboard-preview`.
 
-- **Phase 3: Public Landing Page & Secure Authentication**
+- **Phase 3: Public Landing Page & Secure Authentication (NEXT TARGET)**
   - High-impact editorial hero section with isolated Three.js book showcase.
   - Responsive public pages: Value proposition, interactive catalog peek, feature breakdown, institutional metrics.
   - Secure auth flow: Login, password recovery, session restore, JWT storage strategy, demo one-click credentials selector.
