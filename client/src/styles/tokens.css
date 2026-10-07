@@ -1,0 +1,142 @@
+/**
+ * LIBFLOW Design Tokens (tokens.css)
+ * Centralized, theme-aware custom properties for light and dark modes.
+ * Complies with the high-end-visual-design & minimalist-ui specifications.
+ */
+
+:root {
+  /* Canvas & Foundations (Light: Editorial Warm Bone) */
+  --canvas: #FBFBFA;
+  --canvas-subtle: #F4F3EF;
+  --canvas-text: #111418;
+  --canvas-muted: #64748B;
+  
+  /* Surfaces */
+  --surface: #FFFFFF;
+  --surface-hover: #F8F8F7;
+  --surface-elevated: #FFFFFF;
+  --surface-inset: #F4F3F0;
+  
+  /* Hairline Borders */
+  --border-subtle: rgba(17, 20, 24, 0.08);
+  --border-strong: rgba(17, 20, 24, 0.16);
+  --border-focus: #0F172A;
+
+  /* Primary Brand (Sleek Obsidian/Slate with vibrant cobalt micro-accents) */
+  --brand: #0F172A;
+  --brand-foreground: #FFFFFF;
+  --brand-hover: #1E293B;
+  --brand-active: #020617;
+  --brand-accent: #2563EB;
+  --brand-accent-subtle: #EFF6FF;
+
+  /* Semantic Status: Available (Muted Emerald / Sage) */
+  --status-available-bg: #EDF3EC;
+  --status-available-text: #1E4620;
+  --status-available-border: rgba(30, 70, 32, 0.2);
+  --status-available-dot: #16A34A;
+
+  /* Semantic Status: Overdue / Critical (Washed Crimson) */
+  --status-overdue-bg: #FDEBEC;
+  --status-overdue-text: #991B1B;
+  --status-overdue-border: rgba(153, 27, 27, 0.2);
+  --status-overdue-dot: #DC2626;
+
+  /* Semantic Status: Due Soon / Warning (Warm Amber) */
+  --status-warning-bg: #FEF3C7;
+  --status-warning-text: #92400E;
+  --status-warning-border: rgba(146, 64, 14, 0.25);
+  --status-warning-dot: #D97706;
+
+  /* Semantic Status: Reserved / Info (Airy Slate-Cyan) */
+  --status-info-bg: #E0F2FE;
+  --status-info-text: #075985;
+  --status-info-border: rgba(7, 89, 133, 0.2);
+  --status-info-dot: #0284C7;
+
+  /* Semantic Status: Maintenance / Neutral (Muted Zinc) */
+  --status-neutral-bg: #F1F5F9;
+  --status-neutral-text: #475569;
+  --status-neutral-border: rgba(71, 85, 105, 0.2);
+  --status-neutral-dot: #64748B;
+
+  /* Typography Families */
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Newsreader', Georgia, Cambria, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Controlled Radius Hierarchy */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  /* Micro-Atmospheric Shadows */
+  --shadow-ambient: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  --shadow-elevated: 0 6px 20px -4px rgba(0, 0, 0, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+  --shadow-modal: 0 24px 60px -12px rgba(0, 0, 0, 0.16), 0 6px 18px -2px rgba(0, 0, 0, 0.06);
+
+  /* Transition Physics */
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 220ms;
+  --duration-slow: 350ms;
+}
+
+/* Dark Theme Overrides (OLED Obsidian & Machined Zinc) */
+.dark {
+  --canvas: #090B0E;
+  --canvas-subtle: #0F1216;
+  --canvas-text: #F1F4F9;
+  --canvas-muted: #8E9BAE;
+  
+  --surface: #13171D;
+  --surface-hover: #191E26;
+  --surface-elevated: #181D24;
+  --surface-inset: #0C0F13;
+  
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --border-focus: #38BDF8;
+
+  --brand: #F8FAFC;
+  --brand-foreground: #090B0E;
+  --brand-hover: #E2E8F0;
+  --brand-active: #CBD5E1;
+  --brand-accent: #38BDF8;
+  --brand-accent-subtle: rgba(56, 189, 248, 0.12);
+
+  --status-available-bg: rgba(22, 101, 52, 0.22);
+  --status-available-text: #86EFAC;
+  --status-available-border: rgba(134, 239, 172, 0.25);
+  --status-available-dot: #4ADE80;
+
+  --status-overdue-bg: rgba(153, 27, 27, 0.24);
+  --status-overdue-text: #FCA5A5;
+  --status-overdue-border: rgba(252, 165, 165, 0.25);
+  --status-overdue-dot: #F87171;
+
+  --status-warning-bg: rgba(146, 64, 14, 0.24);
+  --status-warning-text: #FDE68A;
+  --status-warning-border: rgba(253, 230, 138, 0.25);
+  --status-warning-dot: #FBBF24;
+
+  --status-info-bg: rgba(7, 89, 133, 0.24);
+  --status-info-text: #BAE6FD;
+  --status-info-border: rgba(186, 230, 253, 0.25);
+  --status-info-dot: #38BDF8;
+
+  --status-neutral-bg: rgba(71, 85, 105, 0.24);
+  --status-neutral-text: #CBD5E1;
+  --status-neutral-border: rgba(203, 213, 225, 0.2);
+  --status-neutral-dot: #94A3B8;
+
+  --shadow-ambient: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.5);
+  --shadow-elevated: 0 8px 24px -4px rgba(0, 0, 0, 0.7);
+  --shadow-modal: 0 28px 72px -12px rgba(0, 0, 0, 0.85);
+}
