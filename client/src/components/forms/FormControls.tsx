@@ -90,7 +90,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           disabled={disabled}
           className={cn(
             'w-full h-9 sm:h-10 px-3 text-xs sm:text-sm bg-surface text-canvas-text placeholder:text-canvas-muted/70 rounded-md border border-border-subtle transition-all duration-150 ease-spring shadow-ambient',
-            'hover:border-border-strong focus:border-border-focus focus:ring-1 focus:ring-border-focus focus:outline-none',
+            'hover:border-border-strong focus:border-border-focus focus:ring-1 focus:ring-border-focus focus:outline-hidden',
             'disabled:opacity-50 disabled:bg-canvas-subtle disabled:cursor-not-allowed',
             leftIcon && 'pl-9',
             rightIcon && 'pr-9',
@@ -127,7 +127,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, Omit<InputProps, 'type
             tabIndex={-1}
             onClick={() => setShowPassword(!showPassword)}
             aria-label={showPassword ? 'Hide password' : 'Show password'}
-            className="text-canvas-muted hover:text-canvas-text focus:outline-none"
+            className="text-canvas-muted hover:text-canvas-text focus:outline-hidden"
           >
             {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
@@ -198,7 +198,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         disabled={disabled}
         className={cn(
           'w-full p-3 text-xs sm:text-sm bg-surface text-canvas-text placeholder:text-canvas-muted/70 rounded-md border border-border-subtle transition-all duration-150 ease-spring shadow-ambient resize-y',
-          'hover:border-border-strong focus:border-border-focus focus:ring-1 focus:ring-border-focus focus:outline-none',
+          'hover:border-border-strong focus:border-border-focus focus:ring-1 focus:ring-border-focus focus:outline-hidden',
           'disabled:opacity-50 disabled:bg-canvas-subtle disabled:cursor-not-allowed',
           hasError && 'border-rose-500 focus:border-rose-500 focus:ring-rose-500',
           className
@@ -233,7 +233,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         disabled={disabled}
         className={cn(
           'w-full h-9 sm:h-10 px-3 text-xs sm:text-sm bg-surface text-canvas-text rounded-md border border-border-subtle transition-all duration-150 ease-spring shadow-ambient',
-          'hover:border-border-strong focus:border-border-focus focus:ring-1 focus:ring-border-focus focus:outline-none',
+          'hover:border-border-strong focus:border-border-focus focus:ring-1 focus:ring-border-focus focus:outline-hidden',
           'disabled:opacity-50 disabled:bg-canvas-subtle disabled:cursor-not-allowed',
           hasError && 'border-rose-500 focus:border-rose-500 focus:ring-rose-500',
           className
@@ -344,7 +344,7 @@ export const Switch: React.FC<SwitchProps> = ({
         disabled={disabled}
         onClick={() => onChange(!checked)}
         className={cn(
-          'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-spring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus',
+          'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-spring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-border-focus',
           checked ? 'bg-brand' : 'bg-border-strong'
         )}
       >

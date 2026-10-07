@@ -48,7 +48,7 @@ export const Hero3DCanvas: React.FC<Hero3DCanvasProps> = ({
   return (
     <div
       className={cn(
-        'relative w-full aspect-[4/3] sm:aspect-[16/9] max-h-[460px] rounded-2xl overflow-hidden border border-border-subtle bg-gradient-to-b from-canvas-subtle to-surface flex items-center justify-center p-6 select-none shadow-elevated',
+        'relative w-full aspect-4/3 sm:aspect-video max-h-[460px] rounded-2xl overflow-hidden border border-border-subtle bg-linear-to-b from-canvas-subtle to-surface flex items-center justify-center p-6 select-none shadow-elevated',
         className
       )}
     >

@@ -50,7 +50,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
         <div
           role="menu"
           className={cn(
-            'absolute z-50 mt-1.5 w-48 rounded-lg border border-border-subtle bg-surface p-1 shadow-elevated focus:outline-none transition-all duration-150 animate-in fade-in zoom-in-95',
+            'absolute z-50 mt-1.5 w-48 rounded-lg border border-border-subtle bg-surface p-1 shadow-elevated focus:outline-hidden transition-all duration-150 animate-in fade-in zoom-in-95',
             align === 'right' ? 'right-0' : 'left-0'
           )}
         >

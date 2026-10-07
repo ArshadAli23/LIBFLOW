@@ -17,7 +17,7 @@ export type StatusType =
   | 'PAID'
   | 'PENDING';
 
-export type BadgeVariant = 'neutral' | 'success' | 'warning' | 'error' | 'info' | 'brand' | 'outline';
+export type BadgeVariant = 'neutral' | 'success' | 'warning' | 'error' | 'info' | 'brand' | 'outline-solid';
 
 interface StatusConfig {
   label: string;

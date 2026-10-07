@@ -28,7 +28,7 @@ export const Breadcrumb: React.FC<{ items: BreadcrumbItem[]; className?: string 
                 <button
                   type="button"
                   onClick={item.onClick}
-                  className="hover:text-canvas-text transition-colors truncate focus:outline-none focus:underline"
+                  className="hover:text-canvas-text transition-colors truncate focus:outline-hidden focus:underline"
                 >
                   {item.label}
                 </button>
