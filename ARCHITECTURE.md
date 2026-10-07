@@ -1,0 +1,472 @@
+# LIBFLOW — System Architecture & Technical Specification
+
+> **Project:** LIBFLOW Smart Library Management Platform  
+> **Classification:** Production-Grade Modular Enterprise Web Application  
+> **Document Version:** 1.1.0 (Standardized & Reconciled Architecture)  
+> **Tech Stack Baseline:** React 19 • TypeScript • Tailwind CSS • Node.js • Express • TypeScript • MongoDB • Mongoose
+
+---
+
+## 1. High-Level Architectural Overview
+
+LIBFLOW follows a clean, decoupled, layered architecture designed for enterprise maintainability, strict separation of concerns, and future multi-tenant SaaS scaling.
+
+```mermaid
+flowchart TB
+    subgraph ClientLayer ["Client Layer (React 19 + TypeScript + Vite)"]
+        UI["Tailwind CSS + Centralized Design Tokens"]
+        Components["Component Library (ui, navigation, forms, data-display, feedback)"]
+        Store["State Management & Auth Context"]
+        APIClient["API Service Layer (Axios / Fetch Typed Clients)"]
+        ThreeCanvas["Three.js / React Three Fiber Hero (Isolated & Lazy)"]
+    end
+
+    subgraph GatewayLayer ["Network & Security Gateway"]
+        CORS["CORS Policy Guard"]
+        Helmet["HTTP Security Headers"]
+        RateLimiter["IP / Token Rate Limiter"]
+        AuthMiddleware["JWT Authentication & RBAC Guard"]
+    end
+
+    subgraph ServiceLayer ["Backend Core (Node.js + Express + TypeScript)"]
+        Router["Express REST Routers (/api/v1)"]
+        Controllers["Controllers (Input Validation & Response Mapping)"]
+        Services["Domain Services (Core Business Logic)"]
+        Repositories["Data Access Repositories"]
+        Jobs["Scheduled Jobs (node-cron: Expiries, Overdues)"]
+        AuditService["Enterprise Immutable Audit Service"]
+    end
+
+    subgraph DataLayer ["Persistence Layer (MongoDB + Mongoose)"]
+        MongooseODM["Mongoose Schemas (Tenant-Scoped)"]
+        DB[(MongoDB Primary Database)]
+        Indexes["Compound & Unique B-Tree Indexes"]
+    end
+
+    ClientLayer --> GatewayLayer
+    GatewayLayer --> ServiceLayer
+    ServiceLayer --> DataLayer
+```
+
+### Architectural Principles
+1. **Separation of Bibliographic Data and Physical Inventory:** A `Book` is an abstract intellectual work (ISBN, title, author, description). A `BookCopy` is a physical asset with its own unique identifier (`LC-00124`), condition status, shelf placement, and current borrower.
+2. **Business Logic Encapsulation:** Circulation logic (borrow limits, grace periods, due dates, fines, queue seniority) is isolated in specialized domain services (`services/`), never inside route handlers or controllers.
+3. **Audit-Trail Completeness:** All sensitive operations (borrowing, returning, waiving fines, modifying user privileges, copy status changes) record immutable records via `AuditLog`.
+4. **Multi-Tenant Readiness (V1 Simple, SaaS Ready):** Every primary model incorporates `tenantId: string`. For V1, the tenant is `"default-library"`. Future SaaS releases can activate multi-tenant isolation via request tenant-context without altering data contracts.
+5. **Lightweight Scheduled Automation:** Background maintenance (reservation hold expirations, overdue notifications) is executed using lightweight Node.js schedules (`node-cron` in `jobs/`) without requiring heavy external queue infrastructure in V1.
+
+---
+
+## 2. Standardized Technology Stack
+
+| Layer | Standardized Technology | Architectural Role |
+| :--- | :--- | :--- |
+| **Frontend Runtime** | **React 19 + Vite** | Fast modern ESM compiler, Server/Client components readiness, concurrency, strict typing. |
+| **Frontend Language** | **TypeScript (v5.x)** | Complete end-to-end interface and DTO type safety. |
+| **Styling & Design System** | **Tailwind CSS + Centralized Design Tokens** | Utility-first styling bounded by strict, centralized CSS variables/tokens (fonts, semantic pastels, doppelrand radius). |
+| **Micro-Interactions** | **Framer Motion / Motion** | Hardware-accelerated gestures, spring transitions, modal orchestration. |
+| **3D Visuals** | **Three.js / React Three Fiber (R3F)** | Isolated strictly to public hero landing; lazy-loaded with WebGL & `prefers-reduced-motion` fallbacks. |
+| **Icons & Typography** | **Phosphor Icons (Light) + Plus Jakarta Sans / Newsreader / JetBrains Mono** | Ultra-refined line iconography and editorial typography contrast. |
+| **Backend Runtime** | **Node.js (LTS v24.x) + Express.js** | High-performance asynchronous REST API server. |
+| **Backend Language** | **TypeScript (v5.x)** | Type-safe controllers, services, repositories, and middleware. |
+| **Database & ODM** | **MongoDB + Mongoose ODM** | Scalable document persistence with compound indexing, type-safe schemas, and virtual references. |
+| **Authentication** | **JWT (Signed Access Tokens) + bcrypt/Argon2** | Stateless authentication with secure RBAC guards; strictly manual auth (no third-party OAuth). |
+| **Scheduled Tasks** | **node-cron** | Lightweight scheduled jobs for hold expiry checks and daily overdue fines. |
+| **Testing** | **Vitest + React Testing Library + Supertest** | Unified test runner for fast in-memory unit tests and API integration testing. |
+| **API Testing** | **Postman** | Standard collection and environment for automated endpoint verification. |
+
+---
+
+## 3. Domain Data Models & Database Schemas
+
+All primary models include `tenantId` (default: `"default-library"`) for seamless future SaaS portability.
+
+```mermaid
+erDiagram
+    USER ||--o{ AUDIT_LOG : triggers
+    USER ||--o| MEMBER : profile
+    BOOK ||--|{ BOOK_COPY : contains
+    BOOK_COPY ||--o{ BORROW_TRANSACTION : circulates
+    MEMBER ||--o{ BORROW_TRANSACTION : borrows
+    BOOK ||--o{ RESERVATION : queued_for
+    MEMBER ||--o{ RESERVATION : places
+    BORROW_TRANSACTION ||--o| FINE : incurs
+    USER ||--o{ NOTIFICATION : receives
+
+    USER {
+        ObjectId _id
+        string tenantId "default-library"
+        string email
+        string passwordHash
+        string role "ADMIN | LIBRARIAN | MEMBER"
+        string fullName
+        string avatarUrl
+        boolean isActive
+        date lastLogin
+        date createdAt
+    }
+
+    MEMBER {
+        ObjectId _id
+        string tenantId "default-library"
+        ObjectId userRef
+        string memberCode "MEM-2026-XXXX"
+        string memberType "STUDENT | FACULTY | RESEARCHER | GENERAL"
+        string department
+        int activeBorrowsCount
+        int maxBorrowLimit
+        boolean hasOverdueRestrictions
+        date membershipExpiry
+    }
+
+    BOOK {
+        ObjectId _id
+        string tenantId "default-library"
+        string isbn "Unique ISBN-10 or ISBN-13"
+        string title
+        string subtitle
+        string[] authors
+        string publisher
+        string category
+        int publicationYear
+        string edition
+        int pages
+        string description
+        string coverImageUrl
+        string[] tags
+        int totalCopiesCount
+        int availableCopiesCount
+        int timesBorrowed
+    }
+
+    BOOK_COPY {
+        ObjectId _id
+        string tenantId "default-library"
+        ObjectId bookRef
+        int copyNumber
+        string copyCode "Unique LC-00124"
+        string barcode
+        string shelfLocation "e.g. Stack B3, Tier 2"
+        string condition "NEW | GOOD | FAIR | DAMAGED"
+        string status "AVAILABLE | BORROWED | RESERVED | MAINTENANCE | LOST | DAMAGED"
+        ObjectId currentBorrowerRef
+        date acquisitionDate
+        number purchasePrice
+    }
+
+    BORROW_TRANSACTION {
+        ObjectId _id
+        string tenantId "default-library"
+        ObjectId memberRef
+        ObjectId bookRef
+        ObjectId bookCopyRef
+        ObjectId issuedByRef
+        date issueDate
+        date dueDate
+        date returnDate
+        string status "ACTIVE | RETURNED | OVERDUE | LOST | DAMAGED"
+        int renewalCount
+        number fineCalculated
+        string notes
+    }
+
+    RESERVATION {
+        ObjectId _id
+        string tenantId "default-library"
+        ObjectId bookRef
+        ObjectId memberRef
+        int queuePosition
+        string status "WAITING | READY_FOR_PICKUP | CLAIMED | EXPIRED | CANCELLED"
+        date reservedAt
+        date claimWindowExpiresAt
+        ObjectId assignedCopyRef
+    }
+
+    FINE {
+        ObjectId _id
+        string tenantId "default-library"
+        ObjectId transactionRef
+        ObjectId memberRef
+        number amount
+        int daysOverdue
+        string status "UNPAID | PAID | WAIVED"
+        date paidAt
+        string paymentMethod "CASH | CARD | ONLINE"
+        string waiverReason
+        ObjectId waivedByRef
+    }
+
+    NOTIFICATION {
+        ObjectId _id
+        string tenantId "default-library"
+        ObjectId recipientRef
+        string type "BOOK_ISSUED | DUE_SOON | OVERDUE | FINE_LEVIED | HOLD_READY | GENERAL"
+        string title
+        string message
+        string actionUrl
+        boolean isRead
+        date createdAt
+    }
+
+    LIBRARY_SETTINGS {
+        ObjectId _id
+        string tenantId "default-library"
+        string libraryName
+        string logo
+        string primaryColor
+        string secondaryColor
+        string contactEmail
+        string phone
+        string address
+        string website
+        int maxBooksPerMember
+        int defaultBorrowDurationDays
+        int maxRenewalLimit
+        number finePerDay
+        int gracePeriodDays
+        number maxFineCap
+        int reservationExpiryHours
+        string currencySymbol
+        string operatingHours
+    }
+
+    AUDIT_LOG {
+        ObjectId _id
+        string tenantId "default-library"
+        ObjectId actorId
+        string action "BOOK_ISSUE | BOOK_RETURN | FINE_WAIVE | ROLE_CHANGE | SETTINGS_CHANGE..."
+        string entityType "Book | BookCopy | BorrowTransaction | Reservation | Fine | User | Settings"
+        ObjectId entityId
+        object oldValue
+        object newValue
+        string ipAddress
+        date timestamp
+    }
+```
+
+---
+
+## 4. Reservation State Machine Specification
+
+The reservation workflow follows a deterministic, queue-based state machine:
+
+```mermaid
+stateDiagram-v2
+    [*] --> WAITING: Member reserves title (0 available copies)
+    WAITING --> READY_FOR_PICKUP: Physical copy checked in (Member is Priority #1)
+    WAITING --> CANCELLED: Member cancels reservation
+    READY_FOR_PICKUP --> CLAIMED: Desk librarian issues reserved copy to member
+    READY_FOR_PICKUP --> EXPIRED: Claim window passes (e.g., 48 hours without pickup)
+    EXPIRED --> [*]: Copy released to next in queue or returned to AVAILABLE
+    CLAIMED --> [*]
+    CANCELLED --> [*]
+```
+
+### State Definitions & Trigger Matrix
+
+| State | Definition | Trigger / Event |
+| :--- | :--- | :--- |
+| **`WAITING`** | Member is queued in FIFO order waiting for any copy of the book to become available. | Created via `POST /api/v1/reservations`. |
+| **`READY_FOR_PICKUP`** | A physical copy was checked in. The copy status changes to `RESERVED` and is locked to this member. A claim countdown begins (default: 48h). Notification dispatched. | Fired automatically by `CirculationService.returnBook()`. |
+| **`CLAIMED`** | Member arrives at the desk and checks out the reserved copy. The reservation transitions to terminal success. | Fired by `CirculationService.issueBook()`. |
+| **`EXPIRED`** | Member failed to collect the copy within the claim window. The copy is reassigned to the next `WAITING` member or returned to `AVAILABLE`. | Fired by `ReservationExpiryJob` (`node-cron`). |
+| **`CANCELLED`** | Member voluntarily withdraws their hold while still in `WAITING`. | Fired via `DELETE /api/v1/reservations/:id`. |
+
+---
+
+## 5. Centralized Fine & Penalty Calculation Engine
+
+All fine and penalty rules are centralized in `FineService.ts`:
+
+### Mathematical Formula
+Let:
+- $T_{\text{due}}$ = Transaction Due Date
+- $T_{\text{return}}$ = Return Date (or Current Date for active loans)
+- $G$ = Grace Period in Days (`settings.gracePeriodDays`, default: 2)
+- $R$ = Daily Fine Rate (`settings.finePerDay`, default: ₹5.00 / $0.50)
+- $C$ = Maximum Fine Cap (`settings.maxFineCap`, default: ₹100.00 / $25.00)
+
+$$\Delta_{\text{days}} = \max\left(0, \left\lceil \frac{T_{\text{return}} - T_{\text{due}}}{86,400,000} \right\rceil\right)$$
+
+$$\text{BillableDays} = \begin{cases} 0 & \text{if } \Delta_{\text{days}} \le G \\ \Delta_{\text{days}} & \text{if } \Delta_{\text{days}} > G \end{cases}$$
+
+$$\text{FineAmount} = \min\left(C, \text{BillableDays} \times R\right)$$
+
+### Rules Enforced by FineService:
+1. **Grace Period Protection:** If a member returns a book within the grace period (e.g. 2 days), late fee is ₹0. Once exceeding grace, all overdue days are billed according to library policy.
+2. **Deterministic & Testable:** The formula produces identical outputs regardless of whether it is evaluated on return or via daily audit jobs.
+3. **Waiver Audit:** Fines can only be waived by an `ADMIN`. Every waiver requires a non-empty `waiverReason`, creating an immutable `AuditLog` entry.
+
+---
+
+## 6. Immutable Audit Logging Specification
+
+Sensitive administrative and transactional actions automatically trigger `AuditService.log()`:
+
+```typescript
+export interface IAuditLogRecord {
+  tenantId: string;
+  actorId: string; // User ID performing the action
+  action: 
+    | 'BOOK_ISSUE' 
+    | 'BOOK_RETURN' 
+    | 'RENEWAL_GRANTED' 
+    | 'FINE_PAYMENT_RECORDED' 
+    | 'FINE_WAIVED' 
+    | 'USER_ROLE_CHANGED' 
+    | 'SETTINGS_UPDATED' 
+    | 'COPY_STATUS_MODIFIED' 
+    | 'BOOK_DELETED';
+  entityType: 'Book' | 'BookCopy' | 'BorrowTransaction' | 'Reservation' | 'Fine' | 'User' | 'Settings';
+  entityId: string;
+  oldValue?: Record<string, unknown>;
+  newValue?: Record<string, unknown>;
+  ipAddress?: string;
+  timestamp: Date;
+}
+```
+
+Audit records are strictly append-only; update and delete operations are prohibited on the `AuditLog` collection.
+
+---
+
+## 7. Standardized Project Directory Structure
+
+### Frontend Structure (`client/`)
+```
+client/
+├── public/                     # Static assets, favicon, fonts
+├── src/
+│   ├── api/                    # Axios instances & typed API endpoints
+│   ├── assets/                 # SVGs, 3D gltf/glb models, branding assets
+│   ├── components/
+│   │   ├── ui/                 # Atomic UI primitives: Button, Input, Modal, Badge, Card, StatCard...
+│   │   ├── navigation/         # Island Nav, Header, Sidebar, Breadcrumbs
+│   │   ├── forms/              # FormField, SelectField, Checkbox, Switch, DatePicker
+│   │   ├── data-display/       # DataTable, Pagination, Avatar, EmptyState, BookCard
+│   │   └── feedback/           # Toast, Alert, Skeleton, LoadingState, ErrorState
+│   ├── features/               # Domain feature modules (circulation, catalog, reservations)
+│   ├── hooks/                  # useAuth, useDebounce, useMediaQuery, useToast
+│   ├── layouts/                # DashboardLayout, PublicLayout, AuthLayout
+│   ├── pages/
+│   │   ├── public/             # LandingPage (3D Hero), CatalogExplorer, BookDetails
+│   │   ├── auth/               # Login, ForgotPassword, ResetPassword
+│   │   ├── admin/              # Settings, StaffManagement, Analytics, AuditLogs
+│   │   ├── librarian/          # CirculationDesk, Inventory, MemberRecords
+│   │   └── member/             # MemberDashboard, Loans, Fines, Holds, Profile
+│   ├── lib/                    # Third-party wrappers (three-setup, motion-variants)
+│   ├── utils/                  # Date formatters, barcode helpers, currency formatting
+│   ├── constants/              # Roles, state enums, default routes
+│   ├── types/                  # TypeScript interface definitions (DTOs, domain models)
+│   ├── styles/                 # Tailwind base directives & centralized design tokens (tokens.css)
+│   ├── App.tsx                 # Route tree & RBAC guards
+│   └── main.tsx                # Client bootstrap
+├── tailwind.config.ts          # Tailwind CSS configuration mapped to tokens
+├── tsconfig.json
+└── vite.config.ts
+```
+
+### Backend Structure (`server/`)
+```
+server/
+├── config/                     # Database connection, JWT secrets, environment loader
+├── controllers/                # Request validation and HTTP response mapping
+├── middleware/                 # authMiddleware, roleGuard, errorHandler, rateLimiter
+├── models/                     # Mongoose schemas & interfaces (Tenant-scoped)
+├── routes/                     # /api/v1 route definitions
+├── services/                   # Core business logic (Circulation, Fine, Queue, Catalog, Auth)
+├── repositories/               # Direct Mongoose query abstractions
+├── validators/                 # Request payload schemas (Zod or Joi)
+├── utils/                      # ApiError, ApiResponse, Logger, DateUtils
+├── jobs/                       # Scheduled background tasks (node-cron: hold expiry, overdues)
+├── constants/                  # System error codes, roles, state machines
+├── types/                      # Backend TypeScript type definitions
+├── tests/                      # Unit & integration tests (Vitest + Supertest)
+├── index.ts                    # Server initialization & Express listener
+├── tsconfig.json
+└── package.json
+```
+
+---
+
+## 8. RESTful API Specification & Envelopes
+
+Base URI: `/api/v1`
+
+### Success Envelope
+```json
+{
+  "success": true,
+  "message": "Operation completed successfully",
+  "data": { ... },
+  "meta": {
+    "total": 48,
+    "page": 1,
+    "limit": 10,
+    "totalPages": 5
+  }
+}
+```
+
+### Error Envelope
+```json
+{
+  "success": false,
+  "message": "Member has reached the maximum borrowing limit",
+  "error": {
+    "code": "BORROW_QUOTA_EXCEEDED",
+    "details": [
+      {
+        "field": "memberId",
+        "issue": "Active borrows (3) equals quota ceiling (3)"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## 9. UI Design System & Component State Architecture
+
+Adhering strictly to modern editorial SaaS standards (Linear/Notion-tier typography, haptic depth, warm monochrome palette):
+
+### Design Tokens
+- **Backgrounds:** Canvas Bone (`#FBFBFA` / `#F7F6F3`) | Dark OLED Obsidian (`#0D0F11`).
+- **Cards & Doppelrand:** Outer container with hairline border (`rgba(0,0,0,0.06)` or `rgba(255,255,255,0.08)`), subtle ambient padding (`p-1.5`), enclosing an inner high-contrast surface.
+- **Typography:**
+  - Headings / Editorial: `Newsreader` / `Playfair Display`
+  - UI / Body: `Plus Jakarta Sans` / `Geist Sans`
+  - Code / Barcodes: `JetBrains Mono` / `Geist Mono`
+- **Semantic Spot Pastels:**
+  - Success/Available: `#EDF3EC` (Text: `#24542B`)
+  - Overdue/Critical: `#FDEBEC` (Text: `#9F2F2D`)
+  - Warning/Due Soon: `#FBF3DB` (Text: `#8A5B00`)
+  - Info: `#E1F3FE` (Text: `#1F6C9F`)
+
+### Universal Component State Matrix
+All 27 planned UI primitives must gracefully implement:
+`default` • `hover` • `focus-visible` • `active` (with micro-scale `scale(0.98)`) • `disabled` • `loading` (spinner or skeleton) • `error` (accessible inline validation message).
+
+---
+
+## 10. 3D Strategy & Performance Guardrails
+
+- **Scope:** Restricted exclusively to the **Landing Page Hero** (interactive, realistic 3D book model).
+- **Technology:** Three.js / React Three Fiber with `@react-three/drei`.
+- **Performance Budget:** Dynamic code splitting (`React.lazy`), geometric asset footprint $< 350\text{ KB}$, canvas rendering pauses off-viewport (`IntersectionObserver`).
+- **Graceful Fallbacks:** Automatic detection of WebGL capability; if WebGL is unavailable or user enables `prefers-reduced-motion`, render a high-resolution, responsive editorial SVG/raster book mockup.
+- **Dashboard Isolation:** Dashboards, desk counters, and tables remain 100% fast, 2D interfaces.
+
+---
+
+## 11. Security Model & Defensive Posture
+
+1. **Password Security:** Scrypt/Bcrypt (minimum 12 salt rounds); password hash excluded by default from queries (`select: false`).
+2. **Stateless JWT Sessions:** Access tokens signed with HMAC-SHA256, strictly carrying `sub`, `role`, and `tenantId`.
+3. **No Third-Party OAuth:** Standard, manual identity credentials only.
+4. **Defense in Depth:**
+   - Helmet headers (`X-Content-Type-Options`, `X-Frame-Options`, strict CSP).
+   - Rate limiting on authentication routes (maximum 5 failed login attempts per 15-minute window).
+   - Mongo query sanitization to eliminate NoSQL injection risks (`$gt`, `$where` filters).
+   - Centralized input schema validation on all POST/PUT payloads.
