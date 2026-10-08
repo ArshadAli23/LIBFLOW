@@ -3,25 +3,27 @@ import {
   Menu,
   Sun,
   Moon,
-  Bell,
   Search,
   User,
   Settings,
   KeyRound,
   LogOut,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../auth/AuthContext';
 import { Breadcrumb, type BreadcrumbItem } from './Breadcrumb';
 import { Dropdown, type DropdownItem } from '../ui/Dropdown';
 import { Avatar } from '../data-display/Cards';
 import { IconButton } from '../ui/Button';
+import { NotificationDropdown } from './NotificationDropdown';
 
 export interface HeaderProps {
   breadcrumbs: BreadcrumbItem[];
   onOpenSearch?: () => void;
   onOpenMobileMenu?: () => void;
-  unreadNotificationsCount?: number;
+  onNavigate?: (path: string) => void;
   className?: string;
 }
 
@@ -29,29 +31,73 @@ export const Header: React.FC<HeaderProps> = ({
   breadcrumbs,
   onOpenSearch,
   onOpenMobileMenu,
-  unreadNotificationsCount = 3,
+  onNavigate,
   className,
 }) => {
   const { resolvedTheme, toggleTheme } = useTheme();
+  const { user, role, logout, switchDemoRole } = useAuth();
+
+  const handleNavigate = (path: string) => {
+    if (onNavigate) {
+      onNavigate(path);
+    }
+  };
 
   const profileMenuItems: DropdownItem[] = [
     {
       id: 'profile',
       label: 'My Profile',
       icon: <User className="w-4 h-4" />,
-      onClick: () => console.log('Profile clicked'),
+      onClick: () => {
+        if (role === 'ADMIN') handleNavigate('admin/settings');
+        else if (role === 'LIBRARIAN') handleNavigate('librarian/settings/profile');
+        else handleNavigate('member/profile');
+      },
     },
     {
       id: 'settings',
       label: 'Account Settings',
       icon: <Settings className="w-4 h-4" />,
-      onClick: () => console.log('Settings clicked'),
+      onClick: () => {
+        if (role === 'ADMIN') handleNavigate('admin/settings');
+        else if (role === 'LIBRARIAN') handleNavigate('librarian/settings/preferences');
+        else handleNavigate('member/settings');
+      },
     },
     {
       id: 'password',
       label: 'Change Password',
       icon: <KeyRound className="w-4 h-4" />,
-      onClick: () => console.log('Password clicked'),
+      onClick: () => handleNavigate('reset-password'),
+      dividerAfter: true,
+    },
+    // Demo quick switcher for reviewers
+    {
+      id: 'switch-admin',
+      label: 'Switch to Admin (Demo)',
+      icon: <RefreshCw className="w-3.5 h-3.5 text-brand" />,
+      onClick: () => {
+        switchDemoRole('ADMIN');
+        handleNavigate('admin/dashboard');
+      },
+    },
+    {
+      id: 'switch-librarian',
+      label: 'Switch to Librarian (Demo)',
+      icon: <RefreshCw className="w-3.5 h-3.5 text-brand" />,
+      onClick: () => {
+        switchDemoRole('LIBRARIAN');
+        handleNavigate('librarian/dashboard');
+      },
+    },
+    {
+      id: 'switch-member',
+      label: 'Switch to Member (Demo)',
+      icon: <RefreshCw className="w-3.5 h-3.5 text-brand" />,
+      onClick: () => {
+        switchDemoRole('MEMBER');
+        handleNavigate('member/dashboard');
+      },
       dividerAfter: true,
     },
     {
@@ -59,14 +105,17 @@ export const Header: React.FC<HeaderProps> = ({
       label: 'Log Out',
       icon: <LogOut className="w-4 h-4 text-rose-500" />,
       destructive: true,
-      onClick: () => console.log('Logout clicked'),
+      onClick: () => {
+        logout();
+        handleNavigate('login');
+      },
     },
   ];
 
   return (
     <header
       className={cn(
-        'h-16 px-4 sm:px-6 flex items-center justify-between border-b border-border-subtle bg-surface/80 backdrop-blur-md sticky top-0 z-20 select-none',
+        'h-16 px-4 sm:px-6 flex items-center justify-between border-b border-border-subtle bg-surface/85 backdrop-blur-md sticky top-0 z-20 select-none',
         className
       )}
     >
@@ -117,33 +166,29 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={toggleTheme}
         />
 
-        {/* Notifications Bell */}
-        <div className="relative">
-          <IconButton
-            variant="ghost"
-            size="sm"
-            icon={<Bell className="w-4 h-4" />}
-            aria-label="Notifications"
-            onClick={() => console.log('Open notification drawer')}
-          />
-          {unreadNotificationsCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-surface" />
-          )}
-        </div>
+        {/* Notifications Dropdown */}
+        <NotificationDropdown
+          onNavigate={handleNavigate}
+          onNavigateToNotifications={() => {
+            if (role === 'ADMIN') handleNavigate('admin/notifications');
+            else if (role === 'LIBRARIAN') handleNavigate('librarian/operations/notifications');
+            else handleNavigate('member/notifications');
+          }}
+        />
 
         {/* User Profile Dropdown */}
         <div className="pl-1 sm:pl-2 border-l border-border-subtle">
           <Dropdown
             align="right"
             trigger={
-              <div className="flex items-center gap-2.5 p-1 rounded-lg hover:bg-canvas-subtle transition-colors group">
-                <Avatar name="Dr. Elena Vance" size="sm" status="online" />
+              <div className="flex items-center gap-2.5 p-1 rounded-lg hover:bg-canvas-subtle transition-colors group cursor-pointer">
+                <Avatar name={user?.name || 'Authorized User'} size="sm" status="online" />
                 <div className="hidden lg:flex flex-col text-left">
-                  <span className="text-xs font-semibold text-canvas-text group-hover:text-brand leading-none">
-                    Dr. Elena Vance
+                  <span className="text-xs font-semibold text-canvas-text group-hover:text-brand leading-none truncate max-w-[140px]">
+                    {user?.name || 'Guest User'}
                   </span>
                   <span className="text-[10px] font-mono text-canvas-muted uppercase tracking-wider mt-0.5">
-                    Chief Librarian
+                    {user?.role || 'Authorized'}
                   </span>
                 </div>
               </div>

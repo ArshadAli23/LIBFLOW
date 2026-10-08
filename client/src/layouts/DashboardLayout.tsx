@@ -1,32 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from '../components/navigation/Sidebar';
 import { Header } from '../components/navigation/Header';
 import { type BreadcrumbItem } from '../components/navigation/Breadcrumb';
+import { GlobalSearchModal } from '../components/navigation/GlobalSearchModal';
 import { X } from 'lucide-react';
 
 export interface DashboardLayoutProps {
-  currentTab: string;
-  onSelectTab: (tabId: string) => void;
+  currentPath: string;
+  onNavigate: (route: string) => void;
   breadcrumbs?: BreadcrumbItem[];
   children: React.ReactNode;
 }
 
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
-  currentTab,
-  onSelectTab,
+  currentPath,
+  onNavigate,
   breadcrumbs = [{ label: 'Dashboard' }],
   children,
 }) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Global ⌘K / Ctrl+K keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-canvas text-canvas-text font-sans">
       {/* Desktop & Tablet Sidebar */}
       <div className="hidden md:flex shrink-0 h-full">
         <Sidebar
-          currentTab={currentTab}
-          onSelectTab={onSelectTab}
+          currentPath={currentPath}
+          onNavigate={onNavigate}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         />
@@ -55,9 +69,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               </button>
             </div>
             <Sidebar
-              currentTab={currentTab}
-              onSelectTab={(tabId) => {
-                onSelectTab(tabId);
+              currentPath={currentPath}
+              onNavigate={(route) => {
+                onNavigate(route);
                 setIsMobileMenuOpen(false);
               }}
               isCollapsed={false}
@@ -73,13 +87,23 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         <Header
           breadcrumbs={breadcrumbs}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
-          onOpenSearch={() => console.log('Open command palette')}
+          onOpenSearch={() => setIsSearchOpen(true)}
+          onNavigate={onNavigate}
         />
 
         <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 max-w-7xl w-full mx-auto">
           {children}
         </main>
       </div>
+
+      {/* Global Search Modal */}
+      <GlobalSearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onSelectResult={(route) => {
+          onNavigate(route);
+        }}
+      />
     </div>
   );
 };

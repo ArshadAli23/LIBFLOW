@@ -17,7 +17,15 @@ export type StatusType =
   | 'PAID'
   | 'PENDING';
 
-export type BadgeVariant = 'neutral' | 'success' | 'warning' | 'error' | 'info' | 'brand' | 'outline-solid';
+export type BadgeVariant =
+  | 'neutral'
+  | 'success'
+  | 'warning'
+  | 'error'
+  | 'info'
+  | 'brand'
+  | 'outline'
+  | 'outline-solid';
 
 interface StatusConfig {
   label: string;
@@ -64,6 +72,7 @@ export const Badge: React.FC<BadgeProps> = ({
     info: 'bg-status-info-bg text-status-info-text border-status-info-border',
     brand: 'bg-brand text-brand-foreground border-transparent',
     outline: 'bg-transparent text-canvas-text border-border-strong',
+    'outline-solid': 'bg-surface text-canvas-text border-border-strong',
   };
 
   const dotColors: Record<BadgeVariant, string> = {
@@ -74,6 +83,7 @@ export const Badge: React.FC<BadgeProps> = ({
     info: 'bg-sky-500',
     brand: 'bg-brand-foreground',
     outline: 'bg-canvas-text',
+    'outline-solid': 'bg-canvas-text',
   };
 
   const sizeStyles = {
