@@ -17,17 +17,22 @@ import {
   Info,
 } from 'lucide-react';
 
+import { useActiveMember } from '../../features/members/useActiveMember';
+
 export interface MemberFinesPageProps {
   onNavigate: (path: string) => void;
 }
 
 export const MemberFinesPage: React.FC<MemberFinesPageProps> = ({ onNavigate }) => {
   const { user } = useAuth();
+  const { domainId, memberId, isLinked } = useActiveMember();
   const { getFinesForMember, policy } = useFines();
 
-  // Get fines for logged in member (defaults to mem_081 for demo patron Kavita Sharma)
-  const memberId = user?.id === 'usr_member_01' ? 'mem_081' : user?.id || 'mem_081';
-  const memberFines = getFinesForMember(memberId);
+  // Isolate fines to verified active patron identity only
+  const memberFines = React.useMemo(() => {
+    if (!domainId && !memberId) return [];
+    return getFinesForMember(domainId || memberId || '');
+  }, [domainId, memberId, getFinesForMember]);
 
   const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
   const [selectedFineForDetail, setSelectedFineForDetail] = useState<Fine | null>(null);
@@ -157,7 +162,13 @@ export const MemberFinesPage: React.FC<MemberFinesPageProps> = ({ onNavigate }) 
       {/* Tab 1: Active Dues */}
       {activeTab === 'active' && (
         <div className="space-y-4">
-          {activeFines.length === 0 ? (
+          {!isLinked ? (
+            <EmptyState
+              icon={<AlertCircle className="w-8 h-8 text-amber-500" />}
+              title="Institutional Membership Pending"
+              description="Your account is not currently linked to an active library membership card. Please visit the circulation desk to link your patron profile."
+            />
+          ) : activeFines.length === 0 ? (
             <EmptyState
               icon={<CheckCircle2 className="w-8 h-8 text-emerald-500" />}
               title="No outstanding library fines"

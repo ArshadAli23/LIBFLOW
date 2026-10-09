@@ -12,43 +12,31 @@ import {
   Info,
 } from 'lucide-react';
 
+import { useActiveMember } from '../../features/members/useActiveMember';
+import { EmptyState } from '../../components/feedback/FeedbackStates';
+
 export interface MemberCardPageProps {
   onNavigate: (path: string) => void;
 }
 
 export const MemberCardPage: React.FC<MemberCardPageProps> = ({ onNavigate }) => {
-  const { user } = useAuth();
-  const { getMemberById } = useMembers();
+  const { member } = useActiveMember();
 
-  // Find patron record matching authenticated member
-  const member = getMemberById(user?.memberId || 'MB-2026-081') || {
-    id: 'mem_081',
-    tenantId: 'tenant_central',
-    memberId: user?.memberId || 'MB-2026-081',
-    firstName: 'Kavita',
-    lastName: 'Sharma',
-    fullName: user?.name || 'Kavita Sharma',
-    initials: 'KS',
-    email: user?.email || 'kavita.sharma@university.edu',
-    phone: '+1 (555) 349-2810',
-    address: 'Graduate Housing Annex, Apt 4B, University Campus',
-    memberType: 'STUDENT' as const,
-    department: 'Department of Computer Science',
-    program: 'Computer Science M.S. (Distributed Systems)',
-    academicYear: 'Year 2 (Candidate)',
-    status: 'ACTIVE' as const,
-    registrationDate: '2025-08-20',
-    membershipStartDate: '2025-08-20',
-    membershipExpiryDate: '2027-06-30',
-    activeLoansCount: 2,
-    overdueCount: 0,
-    reservationCount: 1,
-    outstandingFine: 0,
-    totalBooksBorrowed: 14,
-    lastActivity: '2026-10-08T09:42:00Z',
-    createdAt: '2025-08-20T10:00:00Z',
-    updatedAt: '2026-10-08T09:42:00Z',
-  };
+  if (!member) {
+    return (
+      <div className="max-w-md mx-auto py-16">
+        <EmptyState
+          icon={<CreditCard className="w-8 h-8 text-amber-500" />}
+          title="Digital Library Pass Unissued"
+          description="No institutional library smartcard is linked to your current login identity. Please present student or faculty credentials at the circulation desk to activate your digital card."
+          action={{
+            label: 'Return to Dashboard',
+            onClick: () => onNavigate('member/dashboard'),
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12 animate-in fade-in duration-200">

@@ -13,6 +13,8 @@ import {
   X,
 } from 'lucide-react';
 
+import { useActiveMember } from '../../features/members/useActiveMember';
+
 export interface MemberReservationsPageProps {
   onNavigate: (path: string) => void;
 }
@@ -21,11 +23,14 @@ export const MemberReservationsPage: React.FC<MemberReservationsPageProps> = ({
   onNavigate,
 }) => {
   const { user } = useAuth();
+  const { memberId, isLinked } = useActiveMember();
   const { getReservationsForMember, cancelReservation } = useReservations();
   const { addToast } = useToast();
 
-  const memberBarcode = user?.memberId || 'MB-2026-081';
-  const myReservations = getReservationsForMember(memberBarcode);
+  const myReservations = useMemo(() => {
+    if (!memberId) return [];
+    return getReservationsForMember(memberId);
+  }, [memberId, getReservationsForMember]);
 
   const activeHolds = myReservations.filter(
     (r) => r.status === 'WAITING' || r.status === 'READY_FOR_PICKUP'
@@ -108,7 +113,13 @@ export const MemberReservationsPage: React.FC<MemberReservationsPageProps> = ({
           </h2>
         </div>
 
-        {activeHolds.length === 0 ? (
+        {!isLinked ? (
+          <EmptyState
+            icon={<Clock className="w-8 h-8 text-amber-500" />}
+            title="Institutional Membership Pending"
+            description="Your user account is not currently associated with an active library membership card. Please visit the circulation desk to link your patron profile."
+          />
+        ) : activeHolds.length === 0 ? (
           <EmptyState
             icon={<Clock className="w-8 h-8 text-canvas-muted" />}
             title="Nothing waiting for you."

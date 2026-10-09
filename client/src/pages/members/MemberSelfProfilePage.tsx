@@ -17,45 +17,37 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
+import { useActiveMember } from '../../features/members/useActiveMember';
+import { EmptyState } from '../../components/feedback/FeedbackStates';
+
 export interface MemberSelfProfilePageProps {
   onNavigate: (path: string) => void;
 }
 
 export const MemberSelfProfilePage: React.FC<MemberSelfProfilePageProps> = ({ onNavigate }) => {
   const { user } = useAuth();
-  const { getMemberById } = useMembers();
+  const { member } = useActiveMember();
   const { addToast } = useToast();
-
-  // Find member matching logged in user (e.g. Kavita Sharma, MB-2026-081)
-  const member = getMemberById(user?.memberId || 'MB-2026-081') || {
-    id: 'mem_081',
-    memberId: user?.memberId || 'MB-2026-081',
-    firstName: 'Kavita',
-    lastName: 'Sharma',
-    fullName: user?.name || 'Kavita Sharma',
-    initials: 'KS',
-    email: user?.email || 'kavita.sharma@university.edu',
-    phone: '+1 (555) 349-2810',
-    address: 'Graduate Housing Annex, Apt 4B, University Campus',
-    memberType: 'STUDENT' as const,
-    department: 'Department of Computer Science',
-    program: 'Computer Science M.S. (Distributed Systems)',
-    academicYear: 'Year 2 (Candidate)',
-    status: 'ACTIVE' as const,
-    registrationDate: '2025-08-20',
-    membershipStartDate: '2025-08-20',
-    membershipExpiryDate: '2027-06-30',
-    activeLoansCount: 2,
-    overdueCount: 0,
-    reservationCount: 1,
-    outstandingFine: 0,
-    totalBooksBorrowed: 14,
-    lastActivity: '2026-10-08T09:42:00Z',
-  };
 
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [updateNotes, setUpdateNotes] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  if (!member) {
+    return (
+      <div className="max-w-md mx-auto py-16">
+        <EmptyState
+          icon={<User className="w-8 h-8 text-amber-500" />}
+          title="Patron Profile Not Linked"
+          description="Your institutional account credentials are not linked to an active library membership record. Please contact circulation administration to verify your patron profile."
+          action={{
+            label: 'Return to Dashboard',
+            onClick: () => onNavigate('member/dashboard'),
+          }}
+        />
+      </div>
+    );
+  }
 
   const handleRequestUpdate = (e: React.FormEvent) => {
     e.preventDefault();

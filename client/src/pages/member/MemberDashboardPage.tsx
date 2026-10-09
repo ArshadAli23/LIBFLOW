@@ -8,7 +8,7 @@
  * Server-side authorization will be implemented in the backend phase.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   BookOpen,
   Clock,
@@ -22,11 +22,15 @@ import {
   CreditCard,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
+import { useActiveMember } from '../../features/members/useActiveMember';
+import { useCirculation } from '../../features/circulation/CirculationContext';
+import { useReservations } from '../../features/reservations/ReservationsContext';
+import { useFines } from '../../features/fines/FinesContext';
+import { formatCurrency } from '../../features/fines/finePolicy';
 import { Card, StatCard, Avatar } from '../../components/data-display/Cards';
 import { StatusBadge, Badge } from '../../components/data-display/Badge';
 import { Button } from '../../components/ui/Button';
-import { Progress } from '../../components/feedback/FeedbackStates';
-import { MOCK_MEMBER_LOANS } from '../../auth/mockAuth';
+import { Progress, EmptyState } from '../../components/feedback/FeedbackStates';
 
 export interface MemberDashboardPageProps {
   onNavigate: (route: string) => void;
@@ -34,6 +38,63 @@ export interface MemberDashboardPageProps {
 
 export const MemberDashboardPage: React.FC<MemberDashboardPageProps> = ({ onNavigate }) => {
   const { user } = useAuth();
+  const { member, memberId, domainId, isLinked } = useActiveMember();
+  const { getLoansForMember } = useCirculation();
+  const { getReservationsForMember } = useReservations();
+  const { getFinesForMember, policy } = useFines();
+
+  // 1. Loans strictly isolated to this active patron
+  const myLoans = useMemo(() => {
+    if (!memberId) return [];
+    return getLoansForMember(memberId);
+  }, [memberId, getLoansForMember]);
+
+  const activeLoans = useMemo(
+    () => myLoans.filter((l) => l.status === 'ACTIVE' || l.status === 'OVERDUE'),
+    [myLoans]
+  );
+
+  const dueSoonCount = useMemo(() => {
+    const now = Date.now();
+    return activeLoans.filter((l) => {
+      const dueTime = new Date(l.dueDate).getTime();
+      const diffDays = Math.ceil((dueTime - now) / (1000 * 60 * 60 * 24));
+      return diffDays <= 3;
+    }).length;
+  }, [activeLoans]);
+
+  // 2. Holds strictly isolated to this active patron
+  const myReservations = useMemo(() => {
+    if (!memberId) return [];
+    return getReservationsForMember(memberId);
+  }, [memberId, getReservationsForMember]);
+
+  const activeHolds = useMemo(
+    () => myReservations.filter((r) => r.status === 'WAITING' || r.status === 'READY_FOR_PICKUP'),
+    [myReservations]
+  );
+
+  const readyPickupHold = useMemo(
+    () => myReservations.find((r) => r.status === 'READY_FOR_PICKUP'),
+    [myReservations]
+  );
+
+  // 3. Fines strictly isolated to this active patron
+  const myFines = useMemo(() => {
+    if (!domainId && !memberId) return [];
+    return getFinesForMember(domainId || memberId || '');
+  }, [domainId, memberId, getFinesForMember]);
+
+  const totalOutstanding = useMemo(() => {
+    return myFines
+      .filter((f) => f.status === 'UNPAID' || f.status === 'PARTIALLY_PAID')
+      .reduce((sum, f) => sum + f.balance, 0);
+  }, [myFines]);
+
+  // Quota allocation
+  const quotaLimit = member?.memberType === 'FACULTY' ? 10 : 5;
+  const currentBorrowed = activeLoans.length;
+  const slotsRemaining = Math.max(0, quotaLimit - currentBorrowed);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
@@ -81,7 +142,7 @@ export const MemberDashboardPage: React.FC<MemberDashboardPageProps> = ({ onNavi
                 {user?.status === 'ACTIVE' ? 'Active Membership' : 'Suspended'}
               </span>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-canvas-subtle border border-border-subtle text-canvas-muted">
-                {user?.memberId || 'MB-2026-081'}
+                {memberId || 'Verification Pending'}
               </span>
             </div>
             <p className="text-xs text-canvas-muted mt-1">
@@ -90,10 +151,10 @@ export const MemberDashboardPage: React.FC<MemberDashboardPageProps> = ({ onNavi
             <div className="flex items-center gap-4 mt-3 text-xs text-canvas-muted">
               <span className="flex items-center gap-1.5 font-mono">
                 <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-                Good Standing
+                {isLinked ? 'Good Standing' : 'Desk Linking Pending'}
               </span>
               <span>•</span>
-              <span className="font-mono">Smartcard ID #84920</span>
+              <span className="font-mono">Smartcard {memberId ? `#${memberId}` : 'Unlinked'}</span>
             </div>
           </div>
         </div>
@@ -105,16 +166,16 @@ export const MemberDashboardPage: React.FC<MemberDashboardPageProps> = ({ onNavi
               Loan Quota
             </span>
             <span className="font-mono font-bold text-canvas-text">
-              {user?.borrowedCount || 3} of {user?.quotaLimit || 5} Books
+              {currentBorrowed} of {quotaLimit} Books
             </span>
           </div>
           <Progress
-            value={(user?.borrowedCount || 3)}
-            max={user?.quotaLimit || 5}
+            value={currentBorrowed}
+            max={quotaLimit}
             className="h-2"
           />
           <p className="text-[10px] text-canvas-muted mt-2 leading-tight">
-            2 additional book slots available under institutional allowance.
+            {slotsRemaining} additional book slot{slotsRemaining === 1 ? '' : 's'} available under institutional allowance.
           </p>
         </div>
       </div>
@@ -128,61 +189,63 @@ export const MemberDashboardPage: React.FC<MemberDashboardPageProps> = ({ onNavi
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <StatCard
             title="Currently Borrowed"
-            value="3 Books"
+            value={`${currentBorrowed} Books`}
             icon={<BookOpen className="w-4 h-4 text-brand" />}
-            supportingText="3 of 5 quota active"
+            supportingText={`${currentBorrowed} of ${quotaLimit} quota active`}
           />
 
           <StatCard
             title="Due Soon"
-            value="1 Book"
+            value={`${dueSoonCount} Book${dueSoonCount === 1 ? '' : 's'}`}
             icon={<Clock className="w-4 h-4 text-amber-500" />}
-            supportingText="Due in 2 days (10 Oct)"
-            trend={{ value: 'Eligible for renewal', isPositive: true }}
+            supportingText={dueSoonCount > 0 ? 'Within 3 days' : 'No urgent returns'}
+            trend={dueSoonCount > 0 ? { value: 'Eligible for renewal', isPositive: true } : undefined}
           />
 
           <StatCard
             title="Active Holds"
-            value="1 Item"
+            value={`${activeHolds.length} Item${activeHolds.length === 1 ? '' : 's'}`}
             icon={<Sparkles className="w-4 h-4 text-emerald-500" />}
-            supportingText="Ready at Counter 2"
-            trend={{ value: 'Hold ready!', isPositive: true }}
+            supportingText={readyPickupHold ? 'Ready at Counter 2' : 'In queue'}
+            trend={readyPickupHold ? { value: 'Hold ready!', isPositive: true } : undefined}
           />
 
           <StatCard
             title="Outstanding Fine"
-            value="$0.00"
+            value={formatCurrency(totalOutstanding, policy.currencySymbol)}
             icon={<ShieldCheck className="w-4 h-4 text-emerald-500" />}
-            supportingText="No balance assessed"
-            trend={{ value: 'Clear record', isPositive: true }}
+            supportingText={totalOutstanding > 0 ? 'Pending payment' : 'No balance assessed'}
+            trend={totalOutstanding === 0 ? { value: 'Clear record', isPositive: true } : { value: 'Dues pending', isPositive: false }}
           />
         </div>
       </section>
 
-      {/* Ready For Pickup Notification Banner */}
-      <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-emerald-500 text-white shrink-0">
-            <CheckCircle className="w-4 h-4" />
+      {/* Ready For Pickup Notification Banner (rendered only if user has ready hold) */}
+      {readyPickupHold && (
+        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-emerald-500 text-white shrink-0">
+              <CheckCircle className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-xs font-semibold text-emerald-900 dark:text-emerald-200">
+                Your Reserved Copy is Staged for Collection!
+              </h4>
+              <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5">
+                "{readyPickupHold.bookTitle}" is waiting at the circulation counter. Present your smartcard for collection.
+              </p>
+            </div>
           </div>
-          <div>
-            <h4 className="text-xs font-semibold text-emerald-900 dark:text-emerald-200">
-              Your Reserved Copy is Staged for Collection!
-            </h4>
-            <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5">
-              Copy LC-00421 ("The Pragmatic Programmer") is waiting at Counter 02. Present your smartcard before 10 Oct.
-            </p>
-          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => onNavigate('member/reservations')}
+            className="shrink-0 text-xs"
+          >
+            View Hold Slip
+          </Button>
         </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => onNavigate('member/reservations')}
-          className="shrink-0 text-xs"
-        >
-          View Hold Slip
-        </Button>
-      </div>
+      )}
 
       {/* Main Section: My Current Loans Table */}
       <Card
@@ -207,61 +270,66 @@ export const MemberDashboardPage: React.FC<MemberDashboardPageProps> = ({ onNavi
           </div>
         }
       >
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-border-subtle text-canvas-muted font-mono uppercase text-[10px]">
-                <th className="pb-3 font-semibold">Book Title & Author</th>
-                <th className="pb-3 font-semibold">Copy Barcode</th>
-                <th className="pb-3 font-semibold">Borrowed On</th>
-                <th className="pb-3 font-semibold">Due Date</th>
-                <th className="pb-3 font-semibold">Status</th>
-                <th className="pb-3 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-subtle/40">
-              {MOCK_MEMBER_LOANS.map((loan) => (
-                <tr key={loan.id} className="hover:bg-canvas-subtle/50 transition-colors">
-                  <td className="py-3.5 pr-4 max-w-xs">
-                    <div className="font-semibold text-canvas-text truncate">{loan.bookTitle}</div>
-                    <div className="text-[11px] text-canvas-muted truncate mt-0.5">{loan.author}</div>
-                  </td>
-                  <td className="py-3.5 pr-4 font-mono text-[11px] text-canvas-muted">
-                    {loan.copyNumber}
-                  </td>
-                  <td className="py-3.5 pr-4 text-canvas-muted">
-                    {loan.borrowedOn}
-                  </td>
-                  <td className="py-3.5 pr-4">
-                    <span className={`font-mono font-semibold ${loan.status === 'WAITING' ? 'text-amber-600 dark:text-amber-400' : 'text-canvas-text'}`}>
-                      {loan.dueDate}
-                    </span>
-                  </td>
-                  <td className="py-3.5 pr-4">
-                    {loan.status === 'WAITING' ? (
-                      <Badge variant="warning" size="sm" withDot>
-                        Due Soon (2d)
-                      </Badge>
-                    ) : (
-                      <StatusBadge status="BORROWED" size="sm" />
-                    )}
-                  </td>
-                  <td className="py-3.5 text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      leftIcon={<RotateCw className="w-3 h-3" />}
-                      onClick={() => alert(`Simulated renewal requested for ${loan.bookTitle}`)}
-                      className="text-xs h-7"
-                    >
-                      Renew
-                    </Button>
-                  </td>
+        {activeLoans.length === 0 ? (
+          <EmptyState
+            icon={<BookOpen className="w-7 h-7 text-canvas-muted" />}
+            title="No active loans"
+            description="You do not currently have any books checked out from the library."
+            action={{
+              label: 'Explore Catalog',
+              onClick: () => onNavigate('member/library/books'),
+            }}
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-border-subtle text-canvas-muted font-mono uppercase text-[10px]">
+                  <th className="pb-3 font-semibold">Book Title</th>
+                  <th className="pb-3 font-semibold">Copy Barcode</th>
+                  <th className="pb-3 font-semibold">Borrowed On</th>
+                  <th className="pb-3 font-semibold">Due Date</th>
+                  <th className="pb-3 font-semibold">Status</th>
+                  <th className="pb-3 font-semibold text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-border-subtle/40">
+                {activeLoans.map((loan) => (
+                  <tr key={loan.id} className="hover:bg-canvas-subtle/50 transition-colors">
+                    <td className="py-3.5 pr-4 max-w-xs">
+                      <div className="font-semibold text-canvas-text truncate">{loan.bookTitle}</div>
+                    </td>
+                    <td className="py-3.5 pr-4 font-mono text-[11px] text-canvas-muted">
+                      {loan.copyBarcode}
+                    </td>
+                    <td className="py-3.5 pr-4 text-canvas-muted">
+                      {loan.checkoutDate}
+                    </td>
+                    <td className="py-3.5 pr-4">
+                      <span className={`font-mono font-semibold ${loan.status === 'OVERDUE' ? 'text-rose-600 dark:text-rose-400' : 'text-canvas-text'}`}>
+                        {loan.dueDate}
+                      </span>
+                    </td>
+                    <td className="py-3.5 pr-4">
+                      <StatusBadge status={loan.status === 'ACTIVE' ? 'BORROWED' : 'OVERDUE'} size="sm" />
+                    </td>
+                    <td className="py-3.5 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        leftIcon={<RotateCw className="w-3 h-3" />}
+                        onClick={() => onNavigate('member/loans')}
+                        className="text-xs h-7"
+                      >
+                        Manage
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
       {/* Member Quick Actions Grid */}

@@ -6,12 +6,15 @@ import { NotificationList } from '../../features/notifications/components/Notifi
 import { NotificationFilters } from '../../features/notifications/components/NotificationFilters';
 import { Bell } from 'lucide-react';
 
+import { useActiveMember } from '../../features/members/useActiveMember';
+
 export interface NotificationsPageProps {
   onNavigate: (path: string) => void;
 }
 
 export const NotificationsPage: React.FC<NotificationsPageProps> = ({ onNavigate }) => {
   const { user, role } = useAuth();
+  const { domainId, memberId } = useActiveMember();
   const {
     getNotificationsForUser,
     getUnreadCount,
@@ -20,8 +23,10 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({ onNavigate
     deleteNotification,
   } = useNotifications();
 
-  // Resolve user identity for notifications
-  const userId = user?.id === 'usr_member_01' ? 'mem_081' : user?.id || 'mem_081';
+  // Resolve isolated user identity for notifications without fallback leakage
+  const userId = role === 'MEMBER'
+    ? (domainId || memberId || user?.id || '')
+    : (user?.id || '');
   const effectiveRole = role || 'MEMBER';
 
   const userNotifications = getNotificationsForUser(userId, effectiveRole);

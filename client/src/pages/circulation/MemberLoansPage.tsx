@@ -10,17 +10,22 @@ import { EmptyState } from '../../components/feedback/FeedbackStates';
 import { useToast } from '../../context/ToastContext';
 import { BookOpen, RotateCcw, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 
+import { useActiveMember } from '../../features/members/useActiveMember';
+
 export interface MemberLoansPageProps {
   onNavigate: (path: string) => void;
 }
 
 export const MemberLoansPage: React.FC<MemberLoansPageProps> = ({ onNavigate }) => {
   const { user } = useAuth();
+  const { memberId, isLinked } = useActiveMember();
   const { getLoansForMember, renewLoan } = useCirculation();
   const { addToast } = useToast();
 
-  const memberBarcode = user?.memberId || 'MB-2026-081';
-  const myLoans = getLoansForMember(memberBarcode);
+  const myLoans = useMemo(() => {
+    if (!memberId) return [];
+    return getLoansForMember(memberId);
+  }, [memberId, getLoansForMember]);
 
   const [activeTab, setActiveTab] = useState<'ACTIVE' | 'HISTORY'>('ACTIVE');
   const [selectedLoanForRenew, setSelectedLoanForRenew] = useState<Loan | null>(null);
@@ -119,7 +124,13 @@ export const MemberLoansPage: React.FC<MemberLoansPageProps> = ({ onNavigate }) 
       </div>
 
       {/* Loans Grid / Cards */}
-      {displayedLoans.length === 0 ? (
+      {!isLinked ? (
+        <EmptyState
+          icon={<AlertCircle className="w-8 h-8 text-amber-500" />}
+          title="Institutional Membership Pending"
+          description="Your account is not currently linked to an active library membership card. Please present identification at the circulation desk to link your patron profile."
+        />
+      ) : displayedLoans.length === 0 ? (
         <EmptyState
           icon={<BookOpen className="w-8 h-8 text-canvas-muted" />}
           title={activeTab === 'ACTIVE' ? 'Your reading shelf is clear.' : 'No return history yet.'}

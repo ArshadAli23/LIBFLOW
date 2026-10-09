@@ -13,6 +13,8 @@ import type { Fine, FinePaymentMethod, FinePaymentRecord, FineWaiverRecord } fro
 import { INITIAL_FINES } from './mockFinesData';
 import { DEFAULT_FINE_POLICY, type FinePolicyConfig } from './finePolicy';
 import { useMembers } from '../members/MembersContext';
+import { useAuth } from '../../auth/AuthContext';
+import { safeStorageGet, safeStorageSet, isArray } from '../../lib/storage';
 
 const STORAGE_KEY = 'libflow_fines_v1';
 
@@ -62,28 +64,17 @@ const FinesContext = createContext<FinesContextType | undefined>(undefined);
 
 export const FinesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { members, updateMember } = useMembers();
+  const { role } = useAuth();
 
-  const [fines, setFines] = useState<Fine[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {
-      // Fallback on parse failure
-    }
-    return INITIAL_FINES;
-  });
+  const [fines, setFines] = useState<Fine[]>(() =>
+    safeStorageGet<Fine[]>(STORAGE_KEY, INITIAL_FINES, isArray)
+  );
 
   const [policy] = useState<FinePolicyConfig>(DEFAULT_FINE_POLICY);
 
   // Sync to localStorage
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(fines));
-    } catch (err) {
-      console.error('Failed to sync fines to localStorage', err);
-    }
+    safeStorageSet(STORAGE_KEY, fines);
   }, [fines]);
 
   // Telemetry Aggregates

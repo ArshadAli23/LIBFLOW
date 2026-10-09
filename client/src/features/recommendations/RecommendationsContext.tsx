@@ -16,6 +16,7 @@ import { useMembers } from '../members/MembersContext';
 import { useCirculation } from '../circulation/CirculationContext';
 import { useReservations } from '../reservations/ReservationsContext';
 import { useAuth } from '../../auth/AuthContext';
+import { safeStorageGet, safeStorageSet, safeStorageRemove, isArray } from '../../lib/storage';
 
 const DISMISSED_STORAGE_KEY = 'libflow_recommendations_v1';
 
@@ -38,26 +39,14 @@ export const RecommendationsProvider: React.FC<{ children: React.ReactNode }> = 
   const { reservations } = useReservations();
   const { user } = useAuth();
 
-  // Dismissed book recommendations persisted to localStorage
-  const [dismissedIds, setDismissedIds] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem(DISMISSED_STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {
-      // Storage unavailable fallback
-    }
-    return [];
-  });
+  // Dismissed book recommendations persisted to localStorage safely
+  const [dismissedIds, setDismissedIds] = useState<string[]>(() =>
+    safeStorageGet<string[]>(DISMISSED_STORAGE_KEY, [], isArray)
+  );
 
   // Sync dismissals to localStorage
   useEffect(() => {
-    try {
-      localStorage.setItem(DISMISSED_STORAGE_KEY, JSON.stringify(dismissedIds));
-    } catch {
-      // Ignore storage errors
-    }
+    safeStorageSet(DISMISSED_STORAGE_KEY, dismissedIds);
   }, [dismissedIds]);
 
   const dismissSet = useMemo(() => new Set(dismissedIds), [dismissedIds]);
@@ -73,11 +62,7 @@ export const RecommendationsProvider: React.FC<{ children: React.ReactNode }> = 
   // Restore all dismissed recommendations
   const restoreAllDismissed = useCallback(() => {
     setDismissedIds([]);
-    try {
-      localStorage.removeItem(DISMISSED_STORAGE_KEY);
-    } catch {
-      // Ignore
-    }
+    safeStorageRemove(DISMISSED_STORAGE_KEY);
   }, []);
 
   // Helper to compute feed for a specific member
@@ -107,9 +92,9 @@ export const RecommendationsProvider: React.FC<{ children: React.ReactNode }> = 
     [books, getMemberById, members, loans, reservations, dismissSet]
   );
 
-  // Identify current authenticated member entity
+  // Identify current authenticated member entity safely without fallback leakage
   const currentMember = useMemo(() => {
-    if (!user) return null;
+    if (!user || user.role !== 'MEMBER') return null;
     return (
       members.find(
         (m) =>
@@ -117,8 +102,7 @@ export const RecommendationsProvider: React.FC<{ children: React.ReactNode }> = 
           m.id === user.id ||
           m.email.toLowerCase() === user.email.toLowerCase()
       ) ||
-      // Fallback: If user is logged in as MEMBER role, default to first student (Kavita Sharma)
-      (user.role === 'MEMBER' ? members[0] : null)
+      (user.id === 'usr_member_01' ? members.find((m) => m.id === 'mem_081') || null : null)
     );
   }, [user, members]);
 

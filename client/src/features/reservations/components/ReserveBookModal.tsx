@@ -7,6 +7,7 @@ import { Button } from '../../../components/ui/Button';
 import { BookCover } from '../../books/components/BookCover';
 import { useToast } from '../../../context/ToastContext';
 import { Clock } from 'lucide-react';
+import { useActiveMember } from '../../members/useActiveMember';
 
 export interface ReserveBookModalProps {
   book: Book | null;
@@ -23,6 +24,7 @@ export const ReserveBookModal: React.FC<ReserveBookModalProps> = ({
 }) => {
   const { createReservation, getReservationsForBook } = useReservations();
   const { user } = useAuth();
+  const { memberId, isLinked } = useActiveMember();
   const { addToast } = useToast();
 
   if (!book) return null;
@@ -33,7 +35,14 @@ export const ReserveBookModal: React.FC<ReserveBookModalProps> = ({
   const projectedPosition = currentBookHolds.length + 1;
 
   const handleConfirmReservation = () => {
-    const memberId = user?.memberId || 'MB-2026-081';
+    if (!isLinked || !memberId) {
+      addToast({
+        title: 'Membership Verification Required',
+        message: 'Your account is not linked to an active library membership card. Please visit the circulation desk to activate borrowing and hold privileges.',
+        type: 'error',
+      });
+      return;
+    }
 
     const result = createReservation({
       memberId,
