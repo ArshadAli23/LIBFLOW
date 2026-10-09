@@ -19,6 +19,7 @@ import {
   ArrowRight,
   ShieldCheck,
   RotateCw,
+  CreditCard,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { Card, StatCard, Avatar } from '../../components/data-display/Cards';
@@ -269,21 +270,40 @@ export const MemberDashboardPage: React.FC<MemberDashboardPageProps> = ({ onNavi
           Patron Actions
         </h2>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
           <button
             type="button"
-            onClick={() => onNavigate('member/saved')}
+            onClick={() => onNavigate('member/library/card')}
             className="p-4 rounded-xl border border-border-subtle bg-surface hover:border-brand hover:shadow-ambient transition-all text-left group flex items-start justify-between"
           >
             <div>
-              <div className="p-2 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 w-fit mb-2">
-                <Search className="w-4 h-4" />
+              <div className="p-2 rounded-lg bg-brand/10 text-brand w-fit mb-2">
+                <CreditCard className="w-4 h-4" />
               </div>
               <h3 className="text-xs font-semibold text-canvas-text group-hover:text-brand transition-colors">
-                Find a Book
+                Digital Library Card
               </h3>
               <p className="text-[11px] text-canvas-muted mt-0.5">
-                Explore catalog & stacks
+                Barcode & QR pass for turnstiles & kiosks
+              </p>
+            </div>
+            <ArrowRight className="w-3.5 h-3.5 text-canvas-muted group-hover:text-brand transition-colors" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate('member/recommendations')}
+            className="p-4 rounded-xl border border-border-subtle bg-surface hover:border-brand hover:shadow-ambient transition-all text-left group flex items-start justify-between"
+          >
+            <div>
+              <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 w-fit mb-2">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <h3 className="text-xs font-semibold text-canvas-text group-hover:text-brand transition-colors">
+                Curated Recommendations
+              </h3>
+              <p className="text-[11px] text-canvas-muted mt-0.5">
+                Curriculum-aligned reading suggestions
               </p>
             </div>
             <ArrowRight className="w-3.5 h-3.5 text-canvas-muted group-hover:text-brand transition-colors" />
@@ -295,7 +315,7 @@ export const MemberDashboardPage: React.FC<MemberDashboardPageProps> = ({ onNavi
             className="p-4 rounded-xl border border-border-subtle bg-surface hover:border-brand hover:shadow-ambient transition-all text-left group flex items-start justify-between"
           >
             <div>
-              <div className="p-2 rounded-lg bg-brand/10 text-brand w-fit mb-2">
+              <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 w-fit mb-2">
                 <BookOpen className="w-4 h-4" />
               </div>
               <h3 className="text-xs font-semibold text-canvas-text group-hover:text-brand transition-colors">
@@ -314,7 +334,7 @@ export const MemberDashboardPage: React.FC<MemberDashboardPageProps> = ({ onNavi
             className="p-4 rounded-xl border border-border-subtle bg-surface hover:border-brand hover:shadow-ambient transition-all text-left group flex items-start justify-between"
           >
             <div>
-              <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 w-fit mb-2">
+              <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 w-fit mb-2">
                 <Clock className="w-4 h-4" />
               </div>
               <h3 className="text-xs font-semibold text-canvas-text group-hover:text-brand transition-colors">
@@ -322,6 +342,25 @@ export const MemberDashboardPage: React.FC<MemberDashboardPageProps> = ({ onNavi
               </h3>
               <p className="text-[11px] text-canvas-muted mt-0.5">
                 Staged holds & wait position
+              </p>
+            </div>
+            <ArrowRight className="w-3.5 h-3.5 text-canvas-muted group-hover:text-brand transition-colors" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate('member/saved')}
+            className="p-4 rounded-xl border border-border-subtle bg-surface hover:border-brand hover:shadow-ambient transition-all text-left group flex items-start justify-between"
+          >
+            <div>
+              <div className="p-2 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 w-fit mb-2">
+                <Search className="w-4 h-4" />
+              </div>
+              <h3 className="text-xs font-semibold text-canvas-text group-hover:text-brand transition-colors">
+                Find a Book
+              </h3>
+              <p className="text-[11px] text-canvas-muted mt-0.5">
+                Explore catalog & stacks
               </p>
             </div>
             <ArrowRight className="w-3.5 h-3.5 text-canvas-muted group-hover:text-brand transition-colors" />

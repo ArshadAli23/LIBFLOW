@@ -5,7 +5,7 @@
  * due date tracking, and complete lifecycle audit timeline.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Barcode,
   Calendar,
@@ -16,10 +16,14 @@ import {
   FileText,
   Activity,
   AlertTriangle,
+  Printer,
 } from 'lucide-react';
 import { Modal } from '../../../components/ui/Modal';
 import { CopyStatusBadge, CopyConditionBadge } from './BookStatusBadge';
 import { Button } from '../../../components/ui/Button';
+import { BarcodeDisplay } from '../../barcode/components/BarcodeDisplay';
+import { QRCodeDisplay } from '../../barcode/components/QRCodeDisplay';
+import { PrintLabelModal } from '../../barcode/components/PrintLabelModal';
 import type { Book, BookCopy } from '../types';
 
 export interface CopyDetailModalProps {
@@ -35,6 +39,7 @@ export const CopyDetailModal: React.FC<CopyDetailModalProps> = ({
   copy,
   book,
 }) => {
+  const [isPrintLabelOpen, setIsPrintLabelOpen] = useState(false);
   if (!copy || !book) return null;
 
   // Synthesize or use existing lifecycle timeline
@@ -89,7 +94,8 @@ export const CopyDetailModal: React.FC<CopyDetailModalProps> = ({
   const timeline = copy.timeline && copy.timeline.length > 0 ? copy.timeline : defaultTimeline;
 
   return (
-    <Modal
+    <>
+      <Modal
       isOpen={isOpen}
       onClose={onClose}
       title={`Copy #${String(copy.copyNumber).padStart(2, '0')} Details`}
@@ -163,6 +169,53 @@ export const CopyDetailModal: React.FC<CopyDetailModalProps> = ({
             </div>
           </div>
         )}
+
+        {/* Physical Copy Identity (Barcode & QR) */}
+        <div className="p-4 rounded-xl bg-surface border border-border-strong space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono uppercase tracking-wider text-canvas-muted font-bold flex items-center gap-1.5">
+              <Barcode className="w-4 h-4 text-brand" />
+              Physical Circulation Barcode & Optical Identity
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsPrintLabelOpen(true)}
+              className="gap-1.5"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print Label</span>
+            </Button>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-3 rounded-lg bg-canvas-subtle border border-border-subtle">
+            <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
+              <span className="text-[10px] font-mono uppercase text-canvas-muted block mb-1">
+                Standard Code 128
+              </span>
+              <BarcodeDisplay
+                value={copy.barcode}
+                size="sm"
+                showText={true}
+                className="bg-transparent border-none p-0"
+              />
+            </div>
+
+            <div className="shrink-0 flex flex-col items-center">
+              <QRCodeDisplay
+                value={JSON.stringify({
+                  type: 'book-copy',
+                  copyId: copy.id,
+                  barcode: copy.barcode,
+                  bookId: copy.bookId,
+                })}
+                size="sm"
+                includeBorder={false}
+                className="bg-transparent border-none p-0"
+              />
+            </div>
+          </div>
+        </div>
 
         {/* Detailed Metadata Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
@@ -260,6 +313,14 @@ export const CopyDetailModal: React.FC<CopyDetailModalProps> = ({
           </div>
         </div>
       </div>
-    </Modal>
+      </Modal>
+
+      <PrintLabelModal
+        isOpen={isPrintLabelOpen}
+        onClose={() => setIsPrintLabelOpen(false)}
+        copy={copy}
+        book={book}
+      />
+    </>
   );
 };

@@ -19,6 +19,9 @@ import {
   RotateCcw,
   Sliders,
   User,
+  QrCode,
+  Sparkles,
+  CreditCard,
 } from 'lucide-react';
 import type { UserRole } from '../auth/types';
 
@@ -99,6 +102,12 @@ export const adminNavigation: NavGroup[] = [
   {
     title: 'Operations',
     items: [
+      {
+        id: 'admin-barcodes',
+        label: 'Barcodes & Scanner',
+        icon: <QrCode className="w-4 h-4" />,
+        route: 'admin/operations/barcodes',
+      },
       {
         id: 'admin-notifications',
         label: 'Notifications',
@@ -191,6 +200,12 @@ export const librarianNavigation: NavGroup[] = [
         label: 'Circulation Desk',
         icon: <RotateCcw className="w-4 h-4" />,
         route: 'librarian/circulation',
+      },
+      {
+        id: 'librarian-barcodes',
+        label: 'Barcodes & Scanner',
+        icon: <QrCode className="w-4 h-4" />,
+        route: 'librarian/operations/barcodes',
       },
       {
         id: 'librarian-reservations',
@@ -317,6 +332,18 @@ export const memberNavigation: NavGroup[] = [
         label: 'Browse Catalog',
         icon: <BookOpen className="w-4 h-4" />,
         route: 'member/library/books',
+      },
+      {
+        id: 'member-recommendations',
+        label: 'Recommendations',
+        icon: <Sparkles className="w-4 h-4" />,
+        route: 'member/recommendations',
+      },
+      {
+        id: 'member-card',
+        label: 'Digital Library Card',
+        icon: <CreditCard className="w-4 h-4" />,
+        route: 'member/library/card',
       },
       {
         id: 'member-loans',

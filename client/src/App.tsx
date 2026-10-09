@@ -41,6 +41,10 @@ import { MemberFinesPage } from './pages/fines/MemberFinesPage';
 import { NotificationsPage } from './pages/notifications/NotificationsPage';
 import { AdminAnalyticsPage } from './pages/analytics/AdminAnalyticsPage';
 import { LibrarianAnalyticsPage } from './pages/analytics/LibrarianAnalyticsPage';
+import { RecommendationsProvider } from './features/recommendations/RecommendationsContext';
+import { BarcodeOperationsPage } from './pages/barcode/BarcodeOperationsPage';
+import { MemberCardPage } from './pages/members/MemberCardPage';
+import { MemberRecommendationsPage } from './pages/recommendations/MemberRecommendationsPage';
 import type { UserRole } from './auth/types';
 import {
   Globe,
@@ -58,6 +62,9 @@ import {
   DollarSign,
   Bell,
   BarChart3,
+  QrCode,
+  Sparkles,
+  CreditCard,
 } from 'lucide-react';
 
 // Roadmap metadata for unimplemented placeholder routes
@@ -680,6 +687,25 @@ function AppContent() {
       );
     }
 
+    // Phase 13: Admin Barcode Operations Route
+    if (pathOnly === 'admin/operations/barcodes' || pathOnly === 'admin/barcodes') {
+      return (
+        <ProtectedRoute allowedRoles={['ADMIN']} onNavigate={navigateTo}>
+          <DashboardLayout
+            currentPath="admin/operations/barcodes"
+            onNavigate={navigateTo}
+            breadcrumbs={[
+              { label: 'LIBFLOW Admin' },
+              { label: 'Operations' },
+              { label: 'Barcodes & Optical Scanner' },
+            ]}
+          >
+            <BarcodeOperationsPage onNavigate={navigateTo} />
+          </DashboardLayout>
+        </ProtectedRoute>
+      );
+    }
+
     // Generic Admin Placeholder Catch-all
     if (pathOnly.startsWith('admin/')) {
       const config = PLACEHOLDER_MODULES_MAP[pathOnly] || {
@@ -1000,6 +1026,25 @@ function AppContent() {
       );
     }
 
+    // Phase 13: Librarian Barcode Operations Route
+    if (pathOnly === 'librarian/operations/barcodes' || pathOnly === 'librarian/barcodes') {
+      return (
+        <ProtectedRoute allowedRoles={['LIBRARIAN']} onNavigate={navigateTo}>
+          <DashboardLayout
+            currentPath="librarian/operations/barcodes"
+            onNavigate={navigateTo}
+            breadcrumbs={[
+              { label: 'Circulation Desk' },
+              { label: 'Operations' },
+              { label: 'Barcodes & Optical Scanner' },
+            ]}
+          >
+            <BarcodeOperationsPage onNavigate={navigateTo} />
+          </DashboardLayout>
+        </ProtectedRoute>
+      );
+    }
+
     // Generic Librarian Placeholder Catch-all
     if (pathOnly.startsWith('librarian/')) {
       const config = PLACEHOLDER_MODULES_MAP[pathOnly] || {
@@ -1185,6 +1230,44 @@ function AppContent() {
             ]}
           >
             <NotificationsPage onNavigate={navigateTo} />
+          </DashboardLayout>
+        </ProtectedRoute>
+      );
+    }
+
+    // Phase 13: Member Digital Library Pass Route
+    if (pathOnly === 'member/library/card' || pathOnly === 'member/card') {
+      return (
+        <ProtectedRoute allowedRoles={['MEMBER']} onNavigate={navigateTo}>
+          <DashboardLayout
+            currentPath="member/library/card"
+            onNavigate={navigateTo}
+            breadcrumbs={[
+              { label: 'Member Portal' },
+              { label: 'Account' },
+              { label: 'Digital Library Pass' },
+            ]}
+          >
+            <MemberCardPage onNavigate={navigateTo} />
+          </DashboardLayout>
+        </ProtectedRoute>
+      );
+    }
+
+    // Phase 14: Member Recommendations Route
+    if (pathOnly === 'member/recommendations') {
+      return (
+        <ProtectedRoute allowedRoles={['MEMBER']} onNavigate={navigateTo}>
+          <DashboardLayout
+            currentPath="member/recommendations"
+            onNavigate={navigateTo}
+            breadcrumbs={[
+              { label: 'Member Portal' },
+              { label: 'My Library' },
+              { label: 'Curated Recommendations' },
+            ]}
+          >
+            <MemberRecommendationsPage onNavigate={navigateTo} />
           </DashboardLayout>
         </ProtectedRoute>
       );
@@ -1481,6 +1564,70 @@ function AppContent() {
 
               <div className="border-t border-border-subtle my-0.5" />
 
+              {/* Batch 4 Core Fast Links */}
+              <div className="px-2.5 py-1 text-[10px] font-mono uppercase text-canvas-muted">
+                Batch 4: Barcodes • Recommendations
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  switchDemoRole('LIBRARIAN');
+                  navigateTo('librarian/operations/barcodes');
+                }}
+                className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-left transition-colors ${
+                  pathOnly === 'librarian/operations/barcodes'
+                    ? 'bg-brand text-brand-foreground font-medium'
+                    : 'hover:bg-canvas-subtle text-canvas-text'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <QrCode className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Barcode Scanner</span>
+                </div>
+                <span className="text-[10px] font-mono opacity-80">/barcodes</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  switchDemoRole('MEMBER');
+                  navigateTo('member/library/card');
+                }}
+                className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-left transition-colors ${
+                  pathOnly === 'member/library/card'
+                    ? 'bg-brand text-brand-foreground font-medium'
+                    : 'hover:bg-canvas-subtle text-canvas-text'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Digital Pass</span>
+                </div>
+                <span className="text-[10px] font-mono opacity-80">/card</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  switchDemoRole('MEMBER');
+                  navigateTo('member/recommendations');
+                }}
+                className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-left transition-colors ${
+                  pathOnly === 'member/recommendations'
+                    ? 'bg-brand text-brand-foreground font-medium'
+                    : 'hover:bg-canvas-subtle text-canvas-text'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                  <span>Recommendations</span>
+                </div>
+                <span className="text-[10px] font-mono opacity-80">/recommendations</span>
+              </button>
+
+              <div className="border-t border-border-subtle my-0.5" />
+
               {/* Public Pages */}
               <button
                 type="button"
@@ -1628,7 +1775,9 @@ export function App() {
                 <ReservationsProvider>
                   <FinesProvider>
                     <NotificationsProvider>
-                      <AppContent />
+                      <RecommendationsProvider>
+                        <AppContent />
+                      </RecommendationsProvider>
                     </NotificationsProvider>
                   </FinesProvider>
                 </ReservationsProvider>

@@ -176,3 +176,19 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Print Media Compliance */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  aside,
+  header,
+  nav,
+  .no-print,
+  [data-no-print] {
+    display: none !important;
+  }
+}
+
