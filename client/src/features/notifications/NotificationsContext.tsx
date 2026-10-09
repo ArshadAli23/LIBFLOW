@@ -12,6 +12,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Notification } from './types';
 import { INITIAL_NOTIFICATIONS } from './mockNotificationsData';
 import type { UserRole } from '../../auth/types';
+import { safeStorageGet, safeStorageSet, isArray } from '../../lib/storage';
 
 const STORAGE_KEY = 'libflow_notifications_v1';
 
@@ -31,24 +32,12 @@ export interface NotificationsContextType {
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
 export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [notifications, setNotifications] = useState<Notification[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {
-      // Fallback
-    }
-    return INITIAL_NOTIFICATIONS;
-  });
+  const [notifications, setNotifications] = useState<Notification[]>(() =>
+    safeStorageGet<Notification[]>(STORAGE_KEY, INITIAL_NOTIFICATIONS, isArray)
+  );
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
-    } catch (err) {
-      console.error('Failed to sync notifications to localStorage', err);
-    }
+    safeStorageSet(STORAGE_KEY, notifications);
   }, [notifications]);
 
   /**
@@ -127,11 +116,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const resetNotificationsToDefault = () => {
     setNotifications(INITIAL_NOTIFICATIONS);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_NOTIFICATIONS));
-    } catch {
-      // Ignored
-    }
+    safeStorageSet(STORAGE_KEY, INITIAL_NOTIFICATIONS);
   };
 
   return (

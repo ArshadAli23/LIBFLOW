@@ -43,21 +43,20 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   if (!fine) return null;
 
   const numericAmount = parseFloat(paymentAmount) || 0;
-  const remainingAfterPayment = Math.max(0, fine.balance - numericAmount);
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (numericAmount <= 0) {
-      setError('Payment amount must be greater than zero.');
+    const amountVal = Number(paymentAmount);
+    if (!Number.isFinite(amountVal) || amountVal <= 0) {
+      setError('Please enter a valid positive payment amount.');
       return;
     }
-    if (numericAmount > fine.balance) {
+    if (amountVal > fine.balance) {
       setError(`Payment cannot exceed current balance of ${formatCurrency(fine.balance)}.`);
       return;
     }
 
     setIsSubmitting(true);
-    onConfirmPayment(fine.id, numericAmount, method, reference.trim(), notes.trim());
+    onConfirmPayment(fine.id, amountVal, method, reference.trim(), notes.trim());
     setIsSubmitting(false);
     onClose();
   };

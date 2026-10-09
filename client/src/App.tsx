@@ -45,6 +45,7 @@ import { RecommendationsProvider } from './features/recommendations/Recommendati
 import { BarcodeOperationsPage } from './pages/barcode/BarcodeOperationsPage';
 import { MemberCardPage } from './pages/members/MemberCardPage';
 import { MemberRecommendationsPage } from './pages/recommendations/MemberRecommendationsPage';
+import { ErrorBoundary } from './components/feedback/ErrorBoundary';
 import type { UserRole } from './auth/types';
 import {
   Globe,
@@ -1766,27 +1767,29 @@ function AppContent() {
 
 export function App() {
   return (
-    <ThemeProvider>
-      <ToastProvider>
-        <AuthProvider>
-          <BooksProvider>
-            <MembersProvider>
-              <CirculationProvider>
-                <ReservationsProvider>
-                  <FinesProvider>
-                    <NotificationsProvider>
-                      <RecommendationsProvider>
-                        <AppContent />
-                      </RecommendationsProvider>
-                    </NotificationsProvider>
-                  </FinesProvider>
-                </ReservationsProvider>
-              </CirculationProvider>
-            </MembersProvider>
-          </BooksProvider>
-        </AuthProvider>
-      </ToastProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <BooksProvider>
+              <MembersProvider>
+                <CirculationProvider>
+                  <ReservationsProvider>
+                    <FinesProvider>
+                      <NotificationsProvider>
+                        <RecommendationsProvider>
+                          <AppContent />
+                        </RecommendationsProvider>
+                      </NotificationsProvider>
+                    </FinesProvider>
+                  </ReservationsProvider>
+                </CirculationProvider>
+              </MembersProvider>
+            </BooksProvider>
+          </AuthProvider>
+        </ToastProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -14,8 +14,17 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem('libflow-theme') as Theme | null;
-    return saved || 'system';
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const saved = localStorage.getItem('libflow-theme') as Theme | null;
+        if (saved === 'light' || saved === 'dark' || saved === 'system') {
+          return saved;
+        }
+      }
+    } catch {
+      // Storage access restricted fallback
+    }
+    return 'system';
   });
 
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>('light');
@@ -41,7 +50,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     updateTheme();
-    localStorage.setItem('libflow-theme', theme);
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('libflow-theme', theme);
+      }
+    } catch {
+      // Ignore
+    }
 
     const listener = () => {
       if (theme === 'system') {

@@ -8,6 +8,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Book, BookCopy } from './types';
 import { INITIAL_BOOKS, INITIAL_COPIES } from './mockBooksData';
+import { safeStorageGet, safeStorageSet, safeStorageRemove, isArray } from '../../lib/storage';
 
 const BOOKS_STORAGE_KEY = 'libflow_books_state_v1';
 const COPIES_STORAGE_KEY = 'libflow_copies_state_v1';
@@ -30,45 +31,21 @@ export interface BooksContextType {
 const BooksContext = createContext<BooksContextType | undefined>(undefined);
 
 export const BooksProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [books, setBooks] = useState<Book[]>(() => {
-    try {
-      const stored = localStorage.getItem(BOOKS_STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {
-      // Fallback
-    }
-    return INITIAL_BOOKS;
-  });
+  const [books, setBooks] = useState<Book[]>(() =>
+    safeStorageGet<Book[]>(BOOKS_STORAGE_KEY, INITIAL_BOOKS, isArray)
+  );
 
-  const [copies, setCopies] = useState<BookCopy[]>(() => {
-    try {
-      const stored = localStorage.getItem(COPIES_STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {
-      // Fallback
-    }
-    return INITIAL_COPIES;
-  });
+  const [copies, setCopies] = useState<BookCopy[]>(() =>
+    safeStorageGet<BookCopy[]>(COPIES_STORAGE_KEY, INITIAL_COPIES, isArray)
+  );
 
-  // Sync state to localStorage
+  // Sync state to localStorage safely
   useEffect(() => {
-    try {
-      localStorage.setItem(BOOKS_STORAGE_KEY, JSON.stringify(books));
-    } catch {
-      // Ignore storage errors
-    }
+    safeStorageSet(BOOKS_STORAGE_KEY, books);
   }, [books]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(COPIES_STORAGE_KEY, JSON.stringify(copies));
-    } catch {
-      // Ignore storage errors
-    }
+    safeStorageSet(COPIES_STORAGE_KEY, copies);
   }, [copies]);
 
   // Helper to re-derive book copy counts from physical copies
@@ -278,12 +255,8 @@ export const BooksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const resetToSeedData = useCallback(() => {
     setBooks(INITIAL_BOOKS);
     setCopies(INITIAL_COPIES);
-    try {
-      localStorage.removeItem(BOOKS_STORAGE_KEY);
-      localStorage.removeItem(COPIES_STORAGE_KEY);
-    } catch {
-      // Ignore
-    }
+    safeStorageRemove(BOOKS_STORAGE_KEY);
+    safeStorageRemove(COPIES_STORAGE_KEY);
   }, []);
 
   return (

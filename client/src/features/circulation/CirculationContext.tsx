@@ -11,6 +11,8 @@ import type { Loan, CirculationPolicy } from './types';
 import { INITIAL_LOANS, DEFAULT_CIRCULATION_POLICY } from './mockLoansData';
 import { useBooks } from '../books/BooksContext';
 import { useMembers } from '../members/MembersContext';
+import { useAuth } from '../../auth/AuthContext';
+import { safeStorageGet, safeStorageSet, isArray } from '../../lib/storage';
 
 const LOANS_STORAGE_KEY = 'libflow_loans_state_v1';
 
@@ -60,28 +62,17 @@ const CirculationContext = createContext<CirculationContextType | undefined>(und
 export const CirculationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { getBookById, getCopyById, updateBookCopy } = useBooks();
   const { getMemberById, updateMember, addMemberActivity } = useMembers();
+  const { user, role } = useAuth();
 
-  const [loans, setLoans] = useState<Loan[]>(() => {
-    try {
-      const stored = localStorage.getItem(LOANS_STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {
-      // Fallback
-    }
-    return INITIAL_LOANS;
-  });
+  const [loans, setLoans] = useState<Loan[]>(() =>
+    safeStorageGet<Loan[]>(LOANS_STORAGE_KEY, INITIAL_LOANS, isArray)
+  );
 
   const [policy] = useState<CirculationPolicy>(DEFAULT_CIRCULATION_POLICY);
 
-  // Sync state to localStorage
+  // Sync state to localStorage safely
   useEffect(() => {
-    try {
-      localStorage.setItem(LOANS_STORAGE_KEY, JSON.stringify(loans));
-    } catch {
-      // Ignore
-    }
+    safeStorageSet(LOANS_STORAGE_KEY, loans);
   }, [loans]);
 
   const getLoans = useCallback(() => loans, [loans]);
@@ -139,6 +130,14 @@ export const CirculationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       bookCopyId: string;
       issuedBy?: string;
     }): CheckoutResult => {
+      // RBAC: Item checkouts require library staff privileges
+      if (role === 'MEMBER') {
+        return {
+          success: false,
+          error: 'Unauthorized: Circulation checkout privileges are restricted to library staff.',
+        };
+      }
+
       // 1. Validate Member
       const member = getMemberById(memberId);
       if (!member) {
@@ -271,6 +270,14 @@ export const CirculationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       loanId: string;
       returnedTo?: string;
     }): ReturnResult => {
+      // RBAC: Item check-ins must be processed by library staff
+      if (role === 'MEMBER') {
+        return {
+          success: false,
+          error: 'Unauthorized: Book check-ins must be processed by library circulation staff.',
+        };
+      }
+
       const loan = loans.find((l) => l.id === loanId || l.loanNumber === loanId);
       if (!loan) {
         return { success: false, error: 'Circulation loan record not found.' };
@@ -344,6 +351,22 @@ export const CirculationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       if (!loan) {
         return { success: false, error: 'Circulation loan not found.' };
       }
+
+      // RBAC: Patrons may only renew their own personal loans
+      if (role === 'MEMBER' && user) {
+        const isOwner =
+          (user.memberId && loan.memberBarcode.toLowerCase() === user.memberId.toLowerCase()) ||
+          (user.id && loan.memberId.toLowerCase() === user.id.toLowerCase()) ||
+          (user.email && loan.memberEmail.toLowerCase() === user.email.toLowerCase()) ||
+          (user.id === 'usr_member_01' && (loan.memberBarcode === 'MB-2026-081' || loan.memberId === 'mem_081'));
+        if (!isOwner) {
+          return {
+            success: false,
+            error: 'Unauthorized: Patrons may only request extension for their own personal loans.',
+          };
+        }
+      }
+
       if (loan.status !== 'ACTIVE') {
         return {
           success: false,

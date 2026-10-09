@@ -8,6 +8,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Member, MemberStatus, MemberActivity } from './types';
 import { INITIAL_MEMBERS, INITIAL_MEMBER_ACTIVITIES } from './mockMembersData';
+import { safeStorageGet, safeStorageSet, safeStorageRemove, isArray, isObject } from '../../lib/storage';
 
 const MEMBERS_STORAGE_KEY = 'libflow_members_state_v1';
 const ACTIVITIES_STORAGE_KEY = 'libflow_member_activities_state_v1';
@@ -43,45 +44,25 @@ export interface MembersContextType {
 const MembersContext = createContext<MembersContextType | undefined>(undefined);
 
 export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [members, setMembers] = useState<Member[]>(() => {
-    try {
-      const stored = localStorage.getItem(MEMBERS_STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {
-      // Fallback
-    }
-    return INITIAL_MEMBERS;
-  });
+  const [members, setMembers] = useState<Member[]>(() =>
+    safeStorageGet<Member[]>(MEMBERS_STORAGE_KEY, INITIAL_MEMBERS, isArray)
+  );
 
-  const [activities, setActivities] = useState<Record<string, MemberActivity[]>>(() => {
-    try {
-      const stored = localStorage.getItem(ACTIVITIES_STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {
-      // Fallback
-    }
-    return INITIAL_MEMBER_ACTIVITIES;
-  });
+  const [activities, setActivities] = useState<Record<string, MemberActivity[]>>(() =>
+    safeStorageGet<Record<string, MemberActivity[]>>(
+      ACTIVITIES_STORAGE_KEY,
+      INITIAL_MEMBER_ACTIVITIES,
+      isObject
+    )
+  );
 
-  // Sync to localStorage
+  // Sync to localStorage safely
   useEffect(() => {
-    try {
-      localStorage.setItem(MEMBERS_STORAGE_KEY, JSON.stringify(members));
-    } catch {
-      // Ignore
-    }
+    safeStorageSet(MEMBERS_STORAGE_KEY, members);
   }, [members]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(ACTIVITIES_STORAGE_KEY, JSON.stringify(activities));
-    } catch {
-      // Ignore
-    }
+    safeStorageSet(ACTIVITIES_STORAGE_KEY, activities);
   }, [activities]);
 
   const getMembers = useCallback(() => members, [members]);
@@ -248,12 +229,8 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const resetMembersToSeedData = useCallback(() => {
     setMembers(INITIAL_MEMBERS);
     setActivities(INITIAL_MEMBER_ACTIVITIES);
-    try {
-      localStorage.removeItem(MEMBERS_STORAGE_KEY);
-      localStorage.removeItem(ACTIVITIES_STORAGE_KEY);
-    } catch {
-      // Ignore
-    }
+    safeStorageRemove(MEMBERS_STORAGE_KEY);
+    safeStorageRemove(ACTIVITIES_STORAGE_KEY);
   }, []);
 
   return (

@@ -40,11 +40,12 @@ export const WaiveFineModal: React.FC<WaiveFineModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (numericAmount <= 0) {
-      setError('Waiver amount must be greater than zero.');
+    const amountVal = Number(waiverAmount);
+    if (!Number.isFinite(amountVal) || amountVal <= 0) {
+      setError('Please enter a valid positive waiver amount.');
       return;
     }
-    if (numericAmount > fine.balance) {
+    if (amountVal > fine.balance) {
       setError(`Waiver amount cannot exceed current balance of ${formatCurrency(fine.balance)}.`);
       return;
     }
@@ -54,7 +55,7 @@ export const WaiveFineModal: React.FC<WaiveFineModalProps> = ({
     }
 
     setIsSubmitting(true);
-    onConfirmWaiver(fine.id, numericAmount, reason.trim(), waivedBy.trim());
+    onConfirmWaiver(fine.id, amountVal, reason.trim(), waivedBy.trim());
     setIsSubmitting(false);
     onClose();
   };

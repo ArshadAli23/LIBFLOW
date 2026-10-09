@@ -122,6 +122,18 @@ export const FinesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     transactionReference?: string,
     notes?: string
   ): Fine | null => {
+    // RBAC: Payment recording is restricted to staff (ADMIN or LIBRARIAN)
+    if (role !== 'ADMIN' && role !== 'LIBRARIAN') {
+      console.warn('[Security Guard] Unauthorized payment recording attempt: staff privileges required.');
+      return null;
+    }
+
+    // Input Validation: Numeric bounds
+    if (!Number.isFinite(amount) || amount <= 0) {
+      console.warn('[Security Guard] Invalid payment amount rejected:', amount);
+      return null;
+    }
+
     let updatedFine: Fine | null = null;
 
     setFines((prevFines) => {
@@ -169,7 +181,7 @@ export const FinesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   /**
-   * Waive a fine with authorized justification
+   * Waive a fine with authorized justification (ADMIN ONLY)
    */
   const waiveFine = (
     fineId: string,
@@ -177,6 +189,22 @@ export const FinesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     reason: string,
     waivedBy: string
   ): Fine | null => {
+    // RBAC: Fine waivers are strictly restricted to ADMIN
+    if (role !== 'ADMIN') {
+      console.warn('[Security Guard] Unauthorized fine waiver attempt: ADMIN privileges strictly required.');
+      return null;
+    }
+
+    // Input Validation: Numeric bounds and documented reason
+    if (!Number.isFinite(amount) || amount <= 0) {
+      console.warn('[Security Guard] Invalid waiver amount rejected:', amount);
+      return null;
+    }
+    if (!reason || !reason.trim()) {
+      console.warn('[Security Guard] Fine waiver rejected: documented justification reason required.');
+      return null;
+    }
+
     let updatedFine: Fine | null = null;
 
     setFines((prevFines) => {

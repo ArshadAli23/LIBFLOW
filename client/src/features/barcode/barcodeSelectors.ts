@@ -23,30 +23,36 @@ export interface BarcodeResolutionContext {
  * Normalizes input barcode string (trims whitespace, uppercase, strips URL scheme if any)
  */
 export function normalizeBarcode(input: string): string {
-  if (!input) return '';
-  const trimmed = input.trim();
+  if (typeof input !== 'string') return '';
+  // Strip control characters and cap maximum payload length to 512 characters
+  const sanitized = input.replace(/[\x00-\x1F\x7F]/g, '').trim();
+  if (!sanitized || sanitized.length > 512) return '';
 
   // 1. JSON payload from scanned QR codes (e.g. from PrintLabelModal or DigitalIdCard)
-  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+  if (sanitized.startsWith('{') && sanitized.endsWith('}')) {
     try {
-      const parsed = JSON.parse(trimmed);
-      if (parsed.barcode) return String(parsed.barcode).trim().toUpperCase();
-      if (parsed.memberId) return String(parsed.memberId).trim().toUpperCase();
-      if (parsed.copyId) return String(parsed.copyId).trim().toUpperCase();
-      if (parsed.loanNumber) return String(parsed.loanNumber).trim().toUpperCase();
-      if (parsed.id) return String(parsed.id).trim().toUpperCase();
+      const parsed = JSON.parse(sanitized);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const candidate = parsed.barcode || parsed.memberId || parsed.copyId || parsed.loanNumber || parsed.id;
+        if (candidate && (typeof candidate === 'string' || typeof candidate === 'number')) {
+          const strCandidate = String(candidate).trim();
+          if (strCandidate.length <= 64) {
+            return strCandidate.toUpperCase();
+          }
+        }
+      }
     } catch {
       // Not valid JSON, proceed to standard normalization
     }
   }
 
   // 2. URI scheme format, e.g. "libflow://copy/LC-00421" or "libflow://member/MB-2026-081"
-  const uriMatch = trimmed.match(/libflow:\/\/(?:copy|member|loan)\/([^/?#]+)/i);
+  const uriMatch = sanitized.match(/^libflow:\/\/(?:copy|member|loan)\/([a-zA-Z0-9_-]{1,64})/i);
   if (uriMatch && uriMatch[1]) {
     return uriMatch[1].toUpperCase();
   }
 
-  return trimmed.toUpperCase();
+  return sanitized.length <= 64 ? sanitized.toUpperCase() : sanitized.slice(0, 64).toUpperCase();
 }
 
 /**

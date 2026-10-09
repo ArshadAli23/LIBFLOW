@@ -10,6 +10,8 @@ import type { Reservation } from './types';
 import { INITIAL_RESERVATIONS } from './mockReservationsData';
 import { useBooks } from '../books/BooksContext';
 import { useMembers } from '../members/MembersContext';
+import { useAuth } from '../../auth/AuthContext';
+import { safeStorageGet, safeStorageSet, safeStorageRemove, isArray } from '../../lib/storage';
 
 const RESERVATIONS_STORAGE_KEY = 'libflow_reservations_state_v1';
 
@@ -37,26 +39,15 @@ const ReservationsContext = createContext<ReservationsContextType | undefined>(u
 export const ReservationsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { getBookById } = useBooks();
   const { getMemberById, updateMember, addMemberActivity } = useMembers();
+  const { user, role } = useAuth();
 
-  const [reservations, setReservations] = useState<Reservation[]>(() => {
-    try {
-      const stored = localStorage.getItem(RESERVATIONS_STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {
-      // Fallback
-    }
-    return INITIAL_RESERVATIONS;
-  });
+  const [reservations, setReservations] = useState<Reservation[]>(() =>
+    safeStorageGet<Reservation[]>(RESERVATIONS_STORAGE_KEY, INITIAL_RESERVATIONS, isArray)
+  );
 
-  // Sync to localStorage
+  // Sync to localStorage safely
   useEffect(() => {
-    try {
-      localStorage.setItem(RESERVATIONS_STORAGE_KEY, JSON.stringify(reservations));
-    } catch {
-      // Ignore
-    }
+    safeStorageSet(RESERVATIONS_STORAGE_KEY, reservations);
   }, [reservations]);
 
   const getReservations = useCallback(() => reservations, [reservations]);
@@ -104,6 +95,21 @@ export const ReservationsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
       if (member.status === 'EXPIRED') {
         return { success: false, error: 'Membership is expired. Please renew registration before placing holds.' };
+      }
+
+      // RBAC: If caller is a patron, they may only place holds for their own membership profile
+      if (role === 'MEMBER' && user) {
+        const isSelf =
+          (user.memberId && (member.memberId.toLowerCase() === user.memberId.toLowerCase() || member.id.toLowerCase() === user.memberId.toLowerCase())) ||
+          (user.id && (member.id.toLowerCase() === user.id.toLowerCase() || member.memberId.toLowerCase() === user.id.toLowerCase())) ||
+          (user.email && member.email.toLowerCase() === user.email.toLowerCase()) ||
+          (user.id === 'usr_member_01' && (member.memberId === 'MB-2026-081' || member.id === 'mem_081'));
+        if (!isSelf) {
+          return {
+            success: false,
+            error: 'Unauthorized: Patrons may only place hold reservations for their own membership profile.',
+          };
+        }
       }
 
       const book = getBookById(bookId);
@@ -179,6 +185,12 @@ export const ReservationsProvider: React.FC<{ children: React.ReactNode }> = ({ 
    */
   const markReadyForPickup = useCallback(
     (reservationId: string, pickupSlot = 'Hold Staging Slot H-04'): Reservation | undefined => {
+      // RBAC: Hold staging requires library staff privileges
+      if (role === 'MEMBER') {
+        console.warn('[Security Guard] Unauthorized hold staging attempt: staff privileges required.');
+        return undefined;
+      }
+
       let updated: Reservation | undefined;
       const now = new Date();
       const nowIso = now.toISOString();
@@ -215,7 +227,7 @@ export const ReservationsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       return updated;
     },
-    [addMemberActivity]
+    [addMemberActivity, role]
   );
 
   /**
@@ -223,6 +235,12 @@ export const ReservationsProvider: React.FC<{ children: React.ReactNode }> = ({ 
    */
   const markClaimed = useCallback(
     (reservationId: string): Reservation | undefined => {
+      // RBAC: Claim fulfillment requires library staff privileges
+      if (role === 'MEMBER') {
+        console.warn('[Security Guard] Unauthorized hold claim attempt: staff privileges required.');
+        return undefined;
+      }
+
       let updated: Reservation | undefined;
       const nowIso = new Date().toISOString();
 
@@ -260,7 +278,7 @@ export const ReservationsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       return updated;
     },
-    [getMemberById, updateMember, addMemberActivity]
+    [getMemberById, updateMember, addMemberActivity, role]
   );
 
   /**
@@ -268,13 +286,26 @@ export const ReservationsProvider: React.FC<{ children: React.ReactNode }> = ({ 
    */
   const cancelReservation = useCallback(
     (reservationId: string, reason?: string): Reservation | undefined => {
+      const target = reservations.find((r) => r.id === reservationId);
+      if (!target) return undefined;
+
+      // RBAC: Patrons may only cancel their own personal hold reservations
+      if (role === 'MEMBER' && user) {
+        const isOwner =
+          (user.memberId && target.memberBarcode.toLowerCase() === user.memberId.toLowerCase()) ||
+          (user.id && target.memberId.toLowerCase() === user.id.toLowerCase()) ||
+          (user.email && target.memberEmail.toLowerCase() === user.email.toLowerCase()) ||
+          (user.id === 'usr_member_01' && (target.memberBarcode === 'MB-2026-081' || target.memberId === 'mem_081'));
+        if (!isOwner) {
+          console.warn('[Security Guard] Unauthorized reservation cancellation attempt: not owner.');
+          return undefined;
+        }
+      }
+
       let cancelled: Reservation | undefined;
       const nowIso = new Date().toISOString();
 
       setReservations((prev) => {
-        const target = prev.find((r) => r.id === reservationId);
-        if (!target) return prev;
-
         cancelled = {
           ...target,
           status: 'CANCELLED' as const,
