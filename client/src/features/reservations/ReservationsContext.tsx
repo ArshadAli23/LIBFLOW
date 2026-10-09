@@ -11,7 +11,7 @@ import { INITIAL_RESERVATIONS } from './mockReservationsData';
 import { useBooks } from '../books/BooksContext';
 import { useMembers } from '../members/MembersContext';
 import { useAuth } from '../../auth/AuthContext';
-import { safeStorageGet, safeStorageSet, isArray } from '../../lib/storage';
+import { safeStorageGet, safeStorageSet, safeStorageRemove, isArray } from '../../lib/storage';
 
 const RESERVATIONS_STORAGE_KEY = 'libflow_reservations_state_v1';
 
@@ -177,7 +177,7 @@ export const ReservationsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       return { success: true, reservation: newReservation };
     },
-    [reservations, getMemberById, getBookById, updateMember, addMemberActivity]
+    [reservations, getMemberById, getBookById, updateMember, addMemberActivity, role, user]
   );
 
   /**
@@ -342,16 +342,12 @@ export const ReservationsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       return cancelled;
     },
-    [getMemberById, updateMember]
+    [reservations, getMemberById, updateMember, role, user]
   );
 
   const resetReservationsToSeedData = useCallback(() => {
     setReservations(INITIAL_RESERVATIONS);
-    try {
-      localStorage.removeItem(RESERVATIONS_STORAGE_KEY);
-    } catch {
-      // Ignore
-    }
+    safeStorageRemove(RESERVATIONS_STORAGE_KEY);
   }, []);
 
   return (

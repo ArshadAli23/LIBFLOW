@@ -12,7 +12,7 @@ import { INITIAL_LOANS, DEFAULT_CIRCULATION_POLICY } from './mockLoansData';
 import { useBooks } from '../books/BooksContext';
 import { useMembers } from '../members/MembersContext';
 import { useAuth } from '../../auth/AuthContext';
-import { safeStorageGet, safeStorageSet, isArray } from '../../lib/storage';
+import { safeStorageGet, safeStorageSet, safeStorageRemove, isArray } from '../../lib/storage';
 
 const LOANS_STORAGE_KEY = 'libflow_loans_state_v1';
 
@@ -252,6 +252,7 @@ export const CirculationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       updateBookCopy,
       updateMember,
       addMemberActivity,
+      role,
     ]
   );
 
@@ -334,7 +335,7 @@ export const CirculationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         wasOverdue,
       };
     },
-    [loans, updateBookCopy, getMemberById, updateMember, addMemberActivity]
+    [loans, updateBookCopy, getMemberById, updateMember, addMemberActivity, role]
   );
 
   /**
@@ -420,11 +421,7 @@ export const CirculationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const resetLoansToSeedData = useCallback(() => {
     setLoans(INITIAL_LOANS);
-    try {
-      localStorage.removeItem(LOANS_STORAGE_KEY);
-    } catch {
-      // Ignore
-    }
+    safeStorageRemove(LOANS_STORAGE_KEY);
   }, []);
 
   return (

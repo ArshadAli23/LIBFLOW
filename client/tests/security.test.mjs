@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeBarcode } from '../src/features/barcode/barcodeSelectors.ts';
-import { safeStorageGet, safeStorageSet, safeStorageRemove, isArray, isObject } from '../src/lib/storage.ts';
+import { safeStorageGet, isArray, isObject } from '../src/lib/storage.ts';
 
 describe('1. Browser Storage and State Integrity', () => {
   test('safeStorageGet returns fallback on non-existent key', () => {

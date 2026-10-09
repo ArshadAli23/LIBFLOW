@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { safeStorageGet, safeStorageSet } from '../lib/storage';
 
 type Theme = 'light' | 'dark' | 'system';
 type ResolvedTheme = 'light' | 'dark';
@@ -11,20 +12,15 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+const THEME_STORAGE_KEY = 'libflow-theme';
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>(() => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const saved = localStorage.getItem('libflow-theme') as Theme | null;
-        if (saved === 'light' || saved === 'dark' || saved === 'system') {
-          return saved;
-        }
-      }
-    } catch {
-      // Storage access restricted fallback
-    }
-    return 'system';
+    return safeStorageGet<Theme>(
+      THEME_STORAGE_KEY,
+      'system',
+      (val): val is Theme => val === 'light' || val === 'dark' || val === 'system'
+    );
   });
 
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>('light');
@@ -50,13 +46,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     updateTheme();
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.setItem('libflow-theme', theme);
-      }
-    } catch {
-      // Ignore
-    }
+    safeStorageSet(THEME_STORAGE_KEY, theme);
 
     const listener = () => {
       if (theme === 'system') {

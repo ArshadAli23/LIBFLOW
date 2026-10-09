@@ -318,11 +318,7 @@ export const FinesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const resetFinesToDefault = () => {
     setFines(INITIAL_FINES);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_FINES));
-    } catch {
-      // Ignored
-    }
+    safeStorageSet(STORAGE_KEY, INITIAL_FINES);
   };
 
   return (
