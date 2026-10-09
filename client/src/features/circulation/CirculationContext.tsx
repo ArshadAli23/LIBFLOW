@@ -415,7 +415,7 @@ export const CirculationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       return { success: true, loan: updatedLoan };
     },
-    [loans, policy, updateBookCopy, getMemberById, addMemberActivity]
+    [loans, policy, updateBookCopy, getMemberById, addMemberActivity, user, role]
   );
 
   const resetLoansToSeedData = useCallback(() => {

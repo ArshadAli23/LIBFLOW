@@ -14,7 +14,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { User, UserRole, AuthContextType } from './types';
 import { DEMO_USERS } from './mockAuth';
-import { safeStorageGet, safeStorageSet } from '../lib/storage';
+import { safeStorageSet } from '../lib/storage';
 
 export const AUTH_STORAGE_KEY = 'libflow_mock_session_v2';
 const LEGACY_STORAGE_KEY = 'libflow_mock_session';

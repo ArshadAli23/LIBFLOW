@@ -42,7 +42,6 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   if (!fine) return null;
 
-  const numericAmount = parseFloat(paymentAmount) || 0;
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const amountVal = Number(paymentAmount);
@@ -60,6 +59,11 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
     setIsSubmitting(false);
     onClose();
   };
+
+  const parsedAmount = Number(paymentAmount);
+  const remainingAfterPayment = Number.isFinite(parsedAmount) && parsedAmount > 0
+    ? Math.max(0, fine.balance - parsedAmount)
+    : fine.balance;
 
   return (
     <Modal

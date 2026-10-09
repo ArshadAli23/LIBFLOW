@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { useAuth } from '../../auth/AuthContext';
-import { useMembers } from '../../features/members/MembersContext';
 import { MemberStatusBadge, MemberTypeBadge } from '../../features/members/components/MemberStatusBadge';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -15,6 +13,7 @@ import {
   Clock,
   ArrowRight,
   ShieldCheck,
+  User,
 } from 'lucide-react';
 
 import { useActiveMember } from '../../features/members/useActiveMember';
@@ -25,7 +24,6 @@ export interface MemberSelfProfilePageProps {
 }
 
 export const MemberSelfProfilePage: React.FC<MemberSelfProfilePageProps> = ({ onNavigate }) => {
-  const { user } = useAuth();
   const { member } = useActiveMember();
   const { addToast } = useToast();
 

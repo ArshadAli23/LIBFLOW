@@ -1,5 +1,4 @@
-import React from 'react';
-import { useAuth } from '../../auth/AuthContext';
+import React, { useMemo } from 'react';
 import { useReservations } from '../../features/reservations/ReservationsContext';
 import { ReservationStatusBadge } from '../../features/reservations/components/ReservationStatusBadge';
 import { BookCover } from '../../features/books/components/BookCover';
@@ -22,7 +21,6 @@ export interface MemberReservationsPageProps {
 export const MemberReservationsPage: React.FC<MemberReservationsPageProps> = ({
   onNavigate,
 }) => {
-  const { user } = useAuth();
   const { memberId, isLinked } = useActiveMember();
   const { getReservationsForMember, cancelReservation } = useReservations();
   const { addToast } = useToast();

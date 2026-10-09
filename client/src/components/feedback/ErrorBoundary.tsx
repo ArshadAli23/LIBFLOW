@@ -8,7 +8,7 @@
  * - Complies with editorial design tokens and accessibility guidelines.
  */
 
-import React, { Component, type ErrorInfo, type ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertCircle, RefreshCw, Home, ShieldAlert } from 'lucide-react';
 import { Button } from '../ui/Button';
 

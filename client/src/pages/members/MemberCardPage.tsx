@@ -1,6 +1,4 @@
 import React from 'react';
-import { useAuth } from '../../auth/AuthContext';
-import { useMembers } from '../../features/members/MembersContext';
 import { DigitalIdCard } from '../../features/barcode/components/DigitalIdCard';
 import { Button } from '../../components/ui/Button';
 import {

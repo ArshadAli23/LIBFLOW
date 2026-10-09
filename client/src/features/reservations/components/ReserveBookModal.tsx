@@ -1,7 +1,6 @@
 import React from 'react';
 import type { Book } from '../../books/types';
 import { useReservations } from '../ReservationsContext';
-import { useAuth } from '../../../auth/AuthContext';
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
 import { BookCover } from '../../books/components/BookCover';
@@ -23,7 +22,6 @@ export const ReserveBookModal: React.FC<ReserveBookModalProps> = ({
   onSuccess,
 }) => {
   const { createReservation, getReservationsForBook } = useReservations();
-  const { user } = useAuth();
   const { memberId, isLinked } = useActiveMember();
   const { addToast } = useToast();
 

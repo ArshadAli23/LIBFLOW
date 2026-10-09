@@ -11,7 +11,7 @@ import { INITIAL_RESERVATIONS } from './mockReservationsData';
 import { useBooks } from '../books/BooksContext';
 import { useMembers } from '../members/MembersContext';
 import { useAuth } from '../../auth/AuthContext';
-import { safeStorageGet, safeStorageSet, safeStorageRemove, isArray } from '../../lib/storage';
+import { safeStorageGet, safeStorageSet, isArray } from '../../lib/storage';
 
 const RESERVATIONS_STORAGE_KEY = 'libflow_reservations_state_v1';
 

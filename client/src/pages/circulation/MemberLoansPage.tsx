@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { useAuth } from '../../auth/AuthContext';
 import { useCirculation } from '../../features/circulation/CirculationContext';
 import type { Loan } from '../../features/circulation/types';
 import { LoanStatusBadge } from '../../features/circulation/components/LoanStatusBadge';
@@ -17,7 +16,6 @@ export interface MemberLoansPageProps {
 }
 
 export const MemberLoansPage: React.FC<MemberLoansPageProps> = ({ onNavigate }) => {
-  const { user } = useAuth();
   const { memberId, isLinked } = useActiveMember();
   const { getLoansForMember, renewLoan } = useCirculation();
   const { addToast } = useToast();

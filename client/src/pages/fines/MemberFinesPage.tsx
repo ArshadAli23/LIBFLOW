@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useAuth } from '../../auth/AuthContext';
 import { useFines } from '../../features/fines/FinesContext';
 import type { Fine } from '../../features/fines/types';
 import { FineStatusBadge } from '../../features/fines/components/FineStatusBadge';
@@ -24,7 +23,6 @@ export interface MemberFinesPageProps {
 }
 
 export const MemberFinesPage: React.FC<MemberFinesPageProps> = ({ onNavigate }) => {
-  const { user } = useAuth();
   const { domainId, memberId, isLinked } = useActiveMember();
   const { getFinesForMember, policy } = useFines();
 

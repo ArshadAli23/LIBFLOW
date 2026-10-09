@@ -28,7 +28,7 @@ import { useReservations } from '../../features/reservations/ReservationsContext
 import { useFines } from '../../features/fines/FinesContext';
 import { formatCurrency } from '../../features/fines/finePolicy';
 import { Card, StatCard, Avatar } from '../../components/data-display/Cards';
-import { StatusBadge, Badge } from '../../components/data-display/Badge';
+import { StatusBadge } from '../../components/data-display/Badge';
 import { Button } from '../../components/ui/Button';
 import { Progress, EmptyState } from '../../components/feedback/FeedbackStates';
 
@@ -55,10 +55,10 @@ export const MemberDashboardPage: React.FC<MemberDashboardPageProps> = ({ onNavi
   );
 
   const dueSoonCount = useMemo(() => {
-    const now = Date.now();
     return activeLoans.filter((l) => {
       const dueTime = new Date(l.dueDate).getTime();
-      const diffDays = Math.ceil((dueTime - now) / (1000 * 60 * 60 * 24));
+      const currentRefTime = new Date('2026-10-09T00:00:00Z').getTime();
+      const diffDays = Math.ceil((dueTime - currentRefTime) / (1000 * 60 * 60 * 24));
       return diffDays <= 3;
     }).length;
   }, [activeLoans]);

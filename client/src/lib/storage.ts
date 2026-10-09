@@ -18,7 +18,7 @@ export const isObject = (v: unknown): v is Record<string, unknown> =>
 export function safeStorageGet<T>(
   key: string,
   fallback: T,
-  validator?: (val: unknown) => val is T
+  validator?: (val: unknown) => boolean
 ): T {
   try {
     if (typeof window === 'undefined' || !window.localStorage) {
