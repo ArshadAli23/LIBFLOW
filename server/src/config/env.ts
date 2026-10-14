@@ -24,7 +24,29 @@ export interface EnvConfig {
   CLIENT_URL: string;
   REQUEST_LIMIT: string;
   LOG_LEVEL: string;
+  MONGODB_URI?: string;
 }
+
+/**
+ * Sanitizes a MongoDB connection URI for safe logging without leaking credentials.
+ */
+export const sanitizeMongoUri = (rawUri?: string): string => {
+  if (!rawUri || typeof rawUri !== 'string') return 'not configured';
+  try {
+    return rawUri.replace(/(mongodb(?:\+srv)?:\/\/)([^:@\s]+):([^@\s]+)@/i, '$1***:***@');
+  } catch {
+    return '[malformed uri]';
+  }
+};
+
+/**
+ * Validates whether a MongoDB URI follows acceptable URI schemes.
+ */
+export const isMongoUriValid = (rawUri?: string): boolean => {
+  if (!rawUri || typeof rawUri !== 'string') return false;
+  const trimmed = rawUri.trim();
+  return trimmed.startsWith('mongodb://') || trimmed.startsWith('mongodb+srv://');
+};
 
 const nodeEnv = (process.env.NODE_ENV || 'development').trim().toLowerCase() as
   | 'development'
@@ -56,6 +78,20 @@ if (nodeEnv === 'production') {
   }
 }
 
+// Parse and validate MONGODB_URI
+const rawMongoUri = process.env.MONGODB_URI ? process.env.MONGODB_URI.trim() : undefined;
+let validatedMongoUri: string | undefined = undefined;
+
+if (rawMongoUri) {
+  if (isMongoUriValid(rawMongoUri)) {
+    validatedMongoUri = rawMongoUri;
+  } else {
+    console.warn(
+      `[DATABASE WARNING] Invalid MONGODB_URI scheme provided (${sanitizeMongoUri(rawMongoUri)}). URI must start with mongodb:// or mongodb+srv://.`
+    );
+  }
+}
+
 export const env: EnvConfig = {
   NODE_ENV: nodeEnv,
   PORT: safePort,
@@ -64,4 +100,6 @@ export const env: EnvConfig = {
   CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:5173',
   REQUEST_LIMIT: process.env.REQUEST_LIMIT || '1mb',
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
+  MONGODB_URI: validatedMongoUri,
 };
+
