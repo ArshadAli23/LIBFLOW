@@ -11,7 +11,7 @@ import { connectDatabase, disconnectDatabase } from './config/database.js';
 let isShuttingDown = false;
 
 const startServer = async () => {
-  // 1. Connect to MongoDB (fails fast in prod, graceful degraded in dev/test)
+  // 1. Connect to MySQL (fails fast in prod, graceful degraded in dev/test)
   try {
     await connectDatabase();
   } catch (_err) {

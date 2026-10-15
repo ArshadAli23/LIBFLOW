@@ -1,5 +1,5 @@
 /**
- * LIBFLOW — Book Mongoose Model (Bibliographic Record)
+ * LIBFLOW — Book Model (Bibliographic Record)
  * 
  * CORE DOMAIN RULE:
  * - A Book represents an abstract bibliographic / title-level record (metadata,
@@ -7,30 +7,29 @@
  * - A Book is NOT a physical copy. Physical units are tracked separately in BookCopy.
  */
 
-import { Schema, model, type Document, type Model } from 'mongoose';
-
 export type BookFormat = 'HARDCOVER' | 'PAPERBACK' | 'DIGITAL' | 'PERIODICAL';
 export type BookStatus = 'ACTIVE' | 'ARCHIVED';
 
-export interface IBook {
+export interface BookEntity {
+  id: string;
   tenantId: string;
-  title: string;
-  subtitle?: string;
-  authors: string[];
   isbn: string;
+  title: string;
+  subtitle?: string | null;
+  authors: string[];
   publisher: string;
   publicationYear: number;
-  edition?: string;
+  edition?: string | null;
   language: string;
   category: string;
-  subcategory?: string;
+  subcategory?: string | null;
   tags: string[];
   description: string;
-  coverUrl?: string;
+  coverUrl?: string | null;
   format: BookFormat;
-  subject?: string;
-  callNumber?: string;
-  deweyDecimal?: string;
+  subject?: string | null;
+  callNumber?: string | null;
+  deweyDecimal?: string | null;
   totalCopies: number;
   availableCopies: number;
   borrowedCopies: number;
@@ -41,187 +40,46 @@ export interface IBook {
   updatedAt: Date;
 }
 
-export type BookDocument = Document & IBook;
-
-const BookSchema = new Schema<BookDocument>(
-  {
-    tenantId: {
-      type: String,
-      required: [true, 'tenantId is required'],
-      default: 'default-library',
-      trim: true,
-      index: true,
-    },
-    title: {
-      type: String,
-      required: [true, 'Book title is required'],
-      trim: true,
-      maxlength: [500, 'Title cannot exceed 500 characters'],
-    },
-    subtitle: {
-      type: String,
-      trim: true,
-      maxlength: [500, 'Subtitle cannot exceed 500 characters'],
-    },
-    authors: {
-      type: [String],
-      required: [true, 'At least one author is required'],
-      validate: {
-        validator: (arr: string[]) => Array.isArray(arr) && arr.length > 0 && arr.some((a) => a.trim().length > 0),
-        message: 'Book must contain at least one valid author name',
-      },
-    },
-    isbn: {
-      type: String,
-      required: [true, 'ISBN is required'],
-      trim: true,
-      maxlength: [32, 'ISBN cannot exceed 32 characters'],
-    },
-    publisher: {
-      type: String,
-      required: [true, 'Publisher is required'],
-      trim: true,
-      maxlength: [200, 'Publisher cannot exceed 200 characters'],
-    },
-    publicationYear: {
-      type: Number,
-      required: [true, 'Publication year is required'],
-      min: [1000, 'Publication year must be >= 1000'],
-      max: [2100, 'Publication year must be <= 2100'],
-      validate: {
-        validator: Number.isInteger,
-        message: 'Publication year must be an integer',
-      },
-    },
-    edition: {
-      type: String,
-      trim: true,
-      maxlength: [100, 'Edition cannot exceed 100 characters'],
-    },
-    language: {
-      type: String,
-      default: 'English',
-      trim: true,
-      maxlength: [100, 'Language cannot exceed 100 characters'],
-    },
-    category: {
-      type: String,
-      required: [true, 'Category is required'],
-      trim: true,
-      index: true,
-      maxlength: [150, 'Category cannot exceed 150 characters'],
-    },
-    subcategory: {
-      type: String,
-      trim: true,
-      maxlength: [150, 'Subcategory cannot exceed 150 characters'],
-    },
-    tags: {
-      type: [String],
-      default: [],
-    },
-    description: {
-      type: String,
-      default: '',
-      trim: true,
-    },
-    coverUrl: {
-      type: String,
-      trim: true,
-    },
-    format: {
-      type: String,
-      enum: {
-        values: ['HARDCOVER', 'PAPERBACK', 'DIGITAL', 'PERIODICAL'],
-        message: '{VALUE} is not a valid book format',
-      },
-      default: 'PAPERBACK',
-    },
-    subject: {
-      type: String,
-      trim: true,
-    },
-    callNumber: {
-      type: String,
-      trim: true,
-    },
-    deweyDecimal: {
-      type: String,
-      trim: true,
-    },
-    totalCopies: {
-      type: Number,
-      default: 0,
-      min: [0, 'totalCopies cannot be negative'],
-    },
-    availableCopies: {
-      type: Number,
-      default: 0,
-      min: [0, 'availableCopies cannot be negative'],
-    },
-    borrowedCopies: {
-      type: Number,
-      default: 0,
-      min: [0, 'borrowedCopies cannot be negative'],
-    },
-    reservedCopies: {
-      type: Number,
-      default: 0,
-      min: [0, 'reservedCopies cannot be negative'],
-    },
-    timesBorrowed: {
-      type: Number,
-      default: 0,
-      min: [0, 'timesBorrowed cannot be negative'],
-    },
-    status: {
-      type: String,
-      enum: {
-        values: ['ACTIVE', 'ARCHIVED'],
-        message: '{VALUE} is not a valid book status',
-      },
-      default: 'ACTIVE',
-      index: true,
-    },
-  },
-  {
-    timestamps: true,
-    toJSON: {
-      virtuals: true,
-      transform: (_doc, ret: Record<string, unknown>) => {
-        ret.id = String(ret._id);
-        delete ret.__v;
-        return ret;
-      },
-    },
+export const parseJsonField = <T>(val: unknown, fallback: T): T => {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === 'string') {
+    try {
+      return JSON.parse(val) as T;
+    } catch {
+      return fallback;
+    }
   }
-);
+  return val as T;
+};
 
-// Compound unique index: ISBN unique within each tenant library
-BookSchema.index({ tenantId: 1, isbn: 1 }, { unique: true });
-
-// Secondary lookup indexes
-BookSchema.index({ tenantId: 1, category: 1 });
-BookSchema.index({ tenantId: 1, status: 1 });
-BookSchema.index({ tenantId: 1, publicationYear: -1 });
-
-// Full-text search index for catalog exploration
-BookSchema.index(
-  {
-    title: 'text',
-    description: 'text',
-    authors: 'text',
-    isbn: 'text',
-  },
-  {
-    weights: {
-      title: 10,
-      isbn: 8,
-      authors: 5,
-      description: 1,
-    },
-    name: 'book_catalog_text_idx',
-  }
-);
-
-export const Book: Model<BookDocument> = model<BookDocument>('Book', BookSchema);
+export const mapBookRow = (row: Record<string, any>): BookEntity => {
+  return {
+    id: String(row.id),
+    tenantId: String(row.tenant_id || 'default-library'),
+    isbn: String(row.isbn),
+    title: String(row.title),
+    subtitle: row.subtitle ? String(row.subtitle) : null,
+    authors: parseJsonField<string[]>(row.authors, []),
+    publisher: String(row.publisher),
+    publicationYear: Number(row.publication_year),
+    edition: row.edition ? String(row.edition) : null,
+    language: String(row.language || 'English'),
+    category: String(row.category),
+    subcategory: row.subcategory ? String(row.subcategory) : null,
+    tags: parseJsonField<string[]>(row.tags, []),
+    description: String(row.description || ''),
+    coverUrl: row.cover_url ? String(row.cover_url) : null,
+    format: (row.format || 'PAPERBACK') as BookFormat,
+    subject: row.subject ? String(row.subject) : null,
+    callNumber: row.call_number ? String(row.call_number) : null,
+    deweyDecimal: row.dewey_decimal ? String(row.dewey_decimal) : null,
+    totalCopies: Number(row.total_copies || 0),
+    availableCopies: Number(row.available_copies || 0),
+    borrowedCopies: Number(row.borrowed_copies || 0),
+    reservedCopies: Number(row.reserved_copies || 0),
+    timesBorrowed: Number(row.times_borrowed || 0),
+    status: (row.status || 'ACTIVE') as BookStatus,
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+  };
+};

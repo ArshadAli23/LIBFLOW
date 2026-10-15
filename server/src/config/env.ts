@@ -1,8 +1,8 @@
 /**
  * LIBFLOW — Environment Configuration & Validation
  * 
- * Centralized, validated environment configuration.
- * Prevents insecure defaults in production.
+ * Centralized, validated environment configuration for MySQL 8+ and Express.
+ * Prevents insecure defaults in production and protects credentials from leaking into logs.
  */
 
 import dotenv from 'dotenv';
@@ -16,6 +16,23 @@ const __dirname = path.dirname(__filename);
 // Load .env file from server root if present
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
+export interface DatabaseEnvConfig {
+  host: string;
+  port: number;
+  user: string;
+  password?: string;
+  database: string;
+  connectionLimit: number;
+}
+
+export interface SanitizedDatabaseEnvConfig {
+  host: string;
+  port: number;
+  user: string;
+  database: string;
+  connectionLimit: number;
+}
+
 export interface EnvConfig {
   NODE_ENV: 'development' | 'production' | 'test';
   PORT: number;
@@ -24,28 +41,72 @@ export interface EnvConfig {
   CLIENT_URL: string;
   REQUEST_LIMIT: string;
   LOG_LEVEL: string;
-  MONGODB_URI?: string;
+  DB: DatabaseEnvConfig;
 }
 
 /**
- * Sanitizes a MongoDB connection URI for safe logging without leaking credentials.
+ * Validates database environment variables.
+ * Returns boolean and an array of diagnostic messages.
  */
-export const sanitizeMongoUri = (rawUri?: string): string => {
-  if (!rawUri || typeof rawUri !== 'string') return 'not configured';
-  try {
-    return rawUri.replace(/(mongodb(?:\+srv)?:\/\/)([^:@\s]+):([^@\s]+)@/i, '$1***:***@');
-  } catch {
-    return '[malformed uri]';
+export const validateDatabaseConfig = (
+  dbConfig: DatabaseEnvConfig,
+  nodeEnv: string
+): { valid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (!dbConfig.host || typeof dbConfig.host !== 'string' || dbConfig.host.trim().length === 0) {
+    errors.push('DB_HOST is missing or invalid.');
   }
+
+  if (
+    !Number.isFinite(dbConfig.port) ||
+    dbConfig.port <= 0 ||
+    dbConfig.port > 65535 ||
+    !Number.isInteger(dbConfig.port)
+  ) {
+    errors.push(`DB_PORT must be an integer between 1 and 65535 (received: ${dbConfig.port}).`);
+  }
+
+  if (!dbConfig.user || typeof dbConfig.user !== 'string' || dbConfig.user.trim().length === 0) {
+    errors.push('DB_USER is missing or invalid.');
+  }
+
+  if (!dbConfig.database || typeof dbConfig.database !== 'string' || dbConfig.database.trim().length === 0) {
+    errors.push('DB_NAME is missing or invalid.');
+  }
+
+  if (
+    !Number.isFinite(dbConfig.connectionLimit) ||
+    dbConfig.connectionLimit < 1 ||
+    dbConfig.connectionLimit > 1000
+  ) {
+    errors.push(`DB_CONNECTION_LIMIT must be a number between 1 and 1000 (received: ${dbConfig.connectionLimit}).`);
+  }
+
+  if (nodeEnv === 'production') {
+    if (!dbConfig.password || dbConfig.password.trim().length === 0) {
+      errors.push('DB_PASSWORD is mandatory in production environment.');
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
 };
 
 /**
- * Validates whether a MongoDB URI follows acceptable URI schemes.
+ * Returns a sanitized copy of database configuration suitable for telemetry and logs.
+ * Never includes DB_PASSWORD.
  */
-export const isMongoUriValid = (rawUri?: string): boolean => {
-  if (!rawUri || typeof rawUri !== 'string') return false;
-  const trimmed = rawUri.trim();
-  return trimmed.startsWith('mongodb://') || trimmed.startsWith('mongodb+srv://');
+export const getSanitizedDatabaseConfig = (dbConfig: DatabaseEnvConfig): SanitizedDatabaseEnvConfig => {
+  return {
+    host: dbConfig.host,
+    port: dbConfig.port,
+    user: dbConfig.user,
+    database: dbConfig.database,
+    connectionLimit: dbConfig.connectionLimit,
+  };
 };
 
 const nodeEnv = (process.env.NODE_ENV || 'development').trim().toLowerCase() as
@@ -78,17 +139,30 @@ if (nodeEnv === 'production') {
   }
 }
 
-// Parse and validate MONGODB_URI
-const rawMongoUri = process.env.MONGODB_URI ? process.env.MONGODB_URI.trim() : undefined;
-let validatedMongoUri: string | undefined = undefined;
+// Parse MySQL database environment variables
+const dbPortParsed = Number.parseInt(process.env.DB_PORT || '3306', 10);
+const dbPort = Number.isFinite(dbPortParsed) && dbPortParsed > 0 && dbPortParsed < 65536 ? dbPortParsed : 3306;
 
-if (rawMongoUri) {
-  if (isMongoUriValid(rawMongoUri)) {
-    validatedMongoUri = rawMongoUri;
+const dbConnectionLimitParsed = Number.parseInt(process.env.DB_CONNECTION_LIMIT || '10', 10);
+const dbConnectionLimit =
+  Number.isFinite(dbConnectionLimitParsed) && dbConnectionLimitParsed > 0 ? dbConnectionLimitParsed : 10;
+
+const dbConfig: DatabaseEnvConfig = {
+  host: (process.env.DB_HOST || 'localhost').trim(),
+  port: dbPort,
+  user: (process.env.DB_USER || 'libflow_user').trim(),
+  password: process.env.DB_PASSWORD !== undefined ? process.env.DB_PASSWORD : '',
+  database: (process.env.DB_NAME || 'libflow_db').trim(),
+  connectionLimit: dbConnectionLimit,
+};
+
+// Validate database config
+const validation = validateDatabaseConfig(dbConfig, nodeEnv);
+if (!validation.valid) {
+  if (nodeEnv === 'production') {
+    throw new Error(`[Configuration FATAL] Database configuration invalid:\n- ${validation.errors.join('\n- ')}`);
   } else {
-    console.warn(
-      `[DATABASE WARNING] Invalid MONGODB_URI scheme provided (${sanitizeMongoUri(rawMongoUri)}). URI must start with mongodb:// or mongodb+srv://.`
-    );
+    console.warn(`[Configuration WARNING] Database configuration warnings:\n- ${validation.errors.join('\n- ')}`);
   }
 }
 
@@ -100,6 +174,5 @@ export const env: EnvConfig = {
   CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:5173',
   REQUEST_LIMIT: process.env.REQUEST_LIMIT || '1mb',
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
-  MONGODB_URI: validatedMongoUri,
+  DB: dbConfig,
 };
-

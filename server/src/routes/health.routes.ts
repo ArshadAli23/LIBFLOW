@@ -1,7 +1,7 @@
 /**
  * LIBFLOW — Health Check Endpoints
  * 
- * Provides system liveness and readiness monitoring.
+ * Provides system liveness, readiness, and database telemetry.
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -13,7 +13,7 @@ const router = Router();
 
 /**
  * @route   GET /api/v1/health
- * @desc    System health, liveness, environment, and database telemetry
+ * @desc    System health, liveness, environment, and MySQL database telemetry
  * @access  Public
  */
 router.get('/', (_req: Request, res: Response) => {
@@ -37,7 +37,8 @@ router.get('/', (_req: Request, res: Response) => {
       status: dbHealth.status,
       connected: dbHealth.connected,
       host: dbHealth.host,
-      name: dbHealth.name,
+      port: dbHealth.port,
+      name: dbHealth.database,
       error: dbHealth.error,
     },
   };
@@ -46,4 +47,3 @@ router.get('/', (_req: Request, res: Response) => {
 });
 
 export default router;
-

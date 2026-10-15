@@ -3,7 +3,7 @@
 > **Project:** LIBFLOW Smart Library Management Platform  
 > **Classification:** Production-Grade Modular Enterprise Web Application  
 > **Document Version:** 1.1.0 (Standardized & Reconciled Architecture)  
-> **Tech Stack Baseline:** React 19 • TypeScript • Tailwind CSS • Node.js • Express • TypeScript • MongoDB • Mongoose
+> **Tech Stack Baseline:** React 19 • TypeScript • Tailwind CSS • Node.js • Express • TypeScript • MySQL 8+ • mysql2
 
 ---
 
@@ -37,10 +37,10 @@ flowchart TB
         AuditService["Enterprise Immutable Audit Service"]
     end
 
-    subgraph DataLayer ["Persistence Layer (MongoDB + Mongoose)"]
-        MongooseODM["Mongoose Schemas (Tenant-Scoped)"]
-        DB[(MongoDB Primary Database)]
-        Indexes["Compound & Unique B-Tree Indexes"]
+    subgraph DataLayer ["Persistence Layer (MySQL 8+ Engine)"]
+        RelationalTables["Relational Schemas (InnoDB, Tenant-Scoped)"]
+        DB[(MySQL 8+ Primary Database)]
+        Indexes["Compound, Unique & Full-Text Indexes"]
     end
 
     ClientLayer --> GatewayLayer
@@ -69,7 +69,7 @@ flowchart TB
 | **Icons & Typography** | **Phosphor Icons (Light) + Plus Jakarta Sans / Newsreader / JetBrains Mono** | Ultra-refined line iconography and editorial typography contrast. |
 | **Backend Runtime** | **Node.js (LTS v24.x) + Express.js** | High-performance asynchronous REST API server. |
 | **Backend Language** | **TypeScript (v5.x)** | Type-safe controllers, services, repositories, and middleware. |
-| **Database & ODM** | **MongoDB + Mongoose ODM** | Scalable document persistence with compound indexing, type-safe schemas, and virtual references. |
+| **Database Engine** | **MySQL 8+ (mysql2)** | High-performance relational persistence with foreign key constraints, connection pooling, transactional multi-table operations, and version-controlled SQL migrations. |
 | **Authentication** | **JWT (Signed Access Tokens) + bcrypt/Argon2** | Stateless authentication with secure RBAC guards; strictly manual auth (no third-party OAuth). |
 | **Scheduled Tasks** | **node-cron** | Lightweight scheduled jobs for hold expiry checks and daily overdue fines. |
 | **Testing** | **Vitest + React Testing Library + Supertest** | Unified test runner for fast in-memory unit tests and API integration testing. |

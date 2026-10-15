@@ -9,7 +9,7 @@
 [![React Version](https://img.shields.io/badge/React-v19.x-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
 [![Vite](https://img.shields.io/badge/Bundler-Vite-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev)
-[![MongoDB](https://img.shields.io/badge/Database-MongoDB-47A248?style=flat-square&logo=mongodb&logoColor=white)](https://www.mongodb.com)
+[![MySQL](https://img.shields.io/badge/Database-MySQL_8+-4479A1?style=flat-square&logo=mysql&logoColor=white)](https://www.mysql.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 
 <p align="center">
@@ -114,7 +114,7 @@ flowchart LR
         Jobs["node-cron Scheduled Jobs"]
     end
 
-    subgraph Storage ["Database (MongoDB + Mongoose)"]
+    subgraph Storage ["Database (MySQL 8+ Relational Engine)"]
         Books[(Books & Copies)]
         Loans[(Loans & Holds)]
         Users[(Users & Members)]
@@ -122,7 +122,7 @@ flowchart LR
     end
 
     Client -->|HTTPS / REST API /api/v1| Server
-    Server -->|Mongoose ODM| Storage
+    Server -->|mysql2 Connection Pool| Storage
 ```
 
 *For complete architectural specifications, see [ARCHITECTURE.md](file:///c:/Users/arsha/Desktop/LIBRARY/ARCHITECTURE.md).*
@@ -133,7 +133,7 @@ flowchart LR
 
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS + Centralized Design Tokens, Phosphor Icons / Clean SVGs, Framer Motion, Three.js / React Three Fiber (Isolated Hero Canvas).
 - **Backend:** Node.js v24 (LTS), Express.js, TypeScript, JWT, bcrypt / Argon2, node-cron.
-- **Database:** MongoDB, Mongoose ODM with compound indexes and tenant scoping (`tenantId`).
+- **Database:** MySQL 8+, mysql2 with connection pooling, strict foreign keys, compound indexes, and version-controlled SQL migrations.
 - **Security:** Helmet, CORS Origin Validation, Express Rate Limit, Mongo Query Sanitization.
 - **Testing:** Vitest, Supertest, React Testing Library, Postman Collections.
 
@@ -257,7 +257,7 @@ All responses adhere to the standard envelope:
 ### Prerequisites
 - **Node.js**: v24+ (LTS)
 - **npm**: v11+
-- **MongoDB**: Local MongoDB instance or MongoDB Atlas connection URI
+- **MySQL Server**: MySQL 8.0+ Community Server or Enterprise
 
 ### 1. Clone & Setup Repository
 ```bash
@@ -283,10 +283,10 @@ cd ../client
 npm install
 ```
 
-### 4. Seed Realistic Demo Data
+### 4. Run Relational Database Migrations
 ```bash
 cd ../server
-npm run seed
+npm run migrate
 ```
 
 ### 5. Launch Development Environment

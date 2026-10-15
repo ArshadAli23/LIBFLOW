@@ -2,7 +2,7 @@
 
 > **Platform:** LIBFLOW Smart Library Management Platform  
 > **Status:** Phase 1 Finalized — Ready for Phase 2 (Design System & UI Foundation)  
-> **Standardized Stack:** React 19 • TypeScript • Tailwind CSS • Node.js • Express • TypeScript • MongoDB • Mongoose
+> **Standardized Stack:** React 19 • TypeScript • Tailwind CSS • Node.js • Express • TypeScript • MySQL 8+ • mysql2
 
 ---
 
@@ -33,7 +33,7 @@
 | **Animation Choreography** | **Framer Motion / Motion** | Hardware-accelerated (`transform`, `opacity`), zero layout thrashing, strict `prefers-reduced-motion` compliance. |
 | **Backend Runtime** | **Node.js (LTS v24.x) + Express.js** | Non-blocking I/O, mature ecosystem, predictable middleware composition. |
 | **Backend Language** | **TypeScript (v5.x)** | Complete backend type safety across controllers, services, repositories, and DTOs. |
-| **Database & ODM** | **MongoDB + Mongoose ODM** | Document-oriented flexibility for bibliographic metadata; indexed relational referencing for transactions, copies, and queues. |
+| **Database Engine** | **MySQL 8+ (mysql2)** | Relational persistence with foreign keys, transactional multi-table integrity, compound indexing, full-text catalog search, and versioned migrations. |
 | **Authentication & Security** | **JWT + bcrypt/Argon2 + Helmet + Express Rate Limit** | Stateless secure session handling, RBAC route guards, OWASP top 10 compliance, input validation schemas via Zod/Joi. |
 | **Scheduled Tasks** | **node-cron** | Lightweight cron scheduler for automated hold claim window expiries and daily overdue penalty checks. |
 | **Testing** | **Vitest + Supertest + React Testing Library** | Lightning-fast in-memory test runner for business logic unit tests and full API integration suites. |
@@ -155,7 +155,7 @@ graph TD
 
 ### Epic 1: Project Setup & Standardized Infrastructure
 - `LIB-101`: Project scaffolding with Vite React 19 + TypeScript client and Node + Express + TypeScript backend.
-- `LIB-102`: MongoDB connectivity, Mongoose models with tenant scoping, and seeding scripts.
+- `LIB-102`: MySQL 8+ connectivity, version-controlled schema migrations (`001_initial_schema.sql`), relational data models with tenant scoping, and connection pooling via `mysql2`.
 - `LIB-103`: Unified error handling, logger, and response envelopes.
 
 ### Epic 2: Design System & Universal UI Primitives

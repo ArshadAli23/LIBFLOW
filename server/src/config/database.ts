@@ -1,127 +1,214 @@
 /**
- * LIBFLOW — MongoDB Database Connection & Lifecycle Manager
+ * LIBFLOW — MySQL Database Connection & Lifecycle Manager
  * 
- * Provides robust connection lifecycle management, health telemetry,
- * sanitized credential logging, and graceful shutdown.
+ * Provides robust connection pooling via mysql2/promise, health telemetry,
+ * transaction orchestration, and graceful shutdown without leaking credentials.
  */
 
-import mongoose from 'mongoose';
-import { env, sanitizeMongoUri } from './env.js';
+import mysql, { type Pool, type PoolConnection } from 'mysql2/promise';
+import { env, getSanitizedDatabaseConfig, type SanitizedDatabaseEnvConfig } from './env.js';
 
 export interface DatabaseHealth {
-  status: 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING' | 'DISCONNECTING';
+  status: 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING' | 'ERROR';
   connected: boolean;
-  readyState: number;
-  host: string | null;
-  name: string | null;
-  sanitizedUri: string;
+  host: string;
+  port: number;
+  database: string;
+  sanitizedConfig: SanitizedDatabaseEnvConfig;
+  activeConnections?: number;
+  idleConnections?: number;
+  lastPingAt?: string | null;
+  latencyMs?: number | null;
   error?: string | null;
 }
 
+let pool: Pool | null = null;
 let lastConnectionError: string | null = null;
+let lastPingTime: Date | null = null;
+let lastPingLatency: number | null = null;
+let isConnected = false;
 
-const READY_STATE_MAP: Record<number, 'DISCONNECTED' | 'CONNECTED' | 'CONNECTING' | 'DISCONNECTING'> = {
-  0: 'DISCONNECTED',
-  1: 'CONNECTED',
-  2: 'CONNECTING',
-  3: 'DISCONNECTING',
+/**
+ * Returns or initializes the shared MySQL connection pool.
+ */
+export const getPool = (): Pool => {
+  if (!pool) {
+    pool = mysql.createPool({
+      host: env.DB.host,
+      port: env.DB.port,
+      user: env.DB.user,
+      password: env.DB.password,
+      database: env.DB.database,
+      waitForConnections: true,
+      connectionLimit: env.DB.connectionLimit,
+      queueLimit: 0,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 10000,
+      charset: 'utf8mb4',
+    });
+  }
+  return pool;
+};
+
+/**
+ * Sanitizes any raw database error message to prevent accidental credential leakage.
+ */
+export const sanitizeDatabaseError = (error: unknown, customPassword?: string): string => {
+  if (!error) return 'Unknown database error';
+  let message = error instanceof Error ? error.message : String(error);
+
+  const pwd = customPassword || env.DB.password;
+  if (pwd && pwd.length > 0) {
+    message = message.split(pwd).join('***');
+  }
+
+  // Common pattern replacements: password=secret, password: secret, password secret
+  message = message.replace(/(password[:=\s]+)(['"]?)([^\s'";,]+)\2/gi, '$1$2***$2');
+  return message;
+};
+
+/**
+ * Validates connectivity to the MySQL database instance.
+ * Never throws — updates internal telemetry and returns connection success boolean.
+ */
+export const pingDatabase = async (): Promise<boolean> => {
+  const currentPool = getPool();
+  const startTime = Date.now();
+
+  try {
+    const connection = await currentPool.getConnection();
+    try {
+      await connection.ping();
+      const latency = Date.now() - startTime;
+      isConnected = true;
+      lastConnectionError = null;
+      lastPingTime = new Date();
+      lastPingLatency = latency;
+      return true;
+    } finally {
+      connection.release();
+    }
+  } catch (error: unknown) {
+    isConnected = false;
+    lastPingLatency = null;
+    const safeMsg = sanitizeDatabaseError(error);
+    lastConnectionError = safeMsg;
+    return false;
+  }
 };
 
 /**
  * Returns real-time database connection telemetry and health status.
- * Strictly reflects Mongoose connection state — never claims connected unless readyState === 1.
+ * Strictly reflects actual MySQL state — never claims connected unless verified.
  */
 export const getDatabaseHealth = (): DatabaseHealth => {
-  const readyState = mongoose.connection.readyState;
-  const status = READY_STATE_MAP[readyState] || 'DISCONNECTED';
-  const isConnected = readyState === 1;
+  const sanitized = getSanitizedDatabaseConfig(env.DB);
 
   return {
-    status,
+    status: isConnected ? 'CONNECTED' : lastConnectionError ? 'ERROR' : 'DISCONNECTED',
     connected: isConnected,
-    readyState,
-    host: isConnected ? mongoose.connection.host || null : null,
-    name: isConnected ? mongoose.connection.name || null : null,
-    sanitizedUri: sanitizeMongoUri(env.MONGODB_URI),
+    host: sanitized.host,
+    port: sanitized.port,
+    database: sanitized.database,
+    sanitizedConfig: sanitized,
+    lastPingAt: lastPingTime ? lastPingTime.toISOString() : null,
+    latencyMs: lastPingLatency,
     error: lastConnectionError,
   };
 };
 
 /**
- * Initializes the MongoDB database connection.
+ * Initializes the MySQL database connection pool and verifies connectivity.
  * 
  * Startup behavior:
- * - Production: Fails fast if MONGODB_URI is missing or initial connection fails.
- * - Development & Test: Starts in a degraded state (API UP, Database DISCONNECTED)
- *   so health diagnostics, docs, and mocks can run without requiring local MongoDB.
+ * - Production: Fails fast if connection cannot be established.
+ * - Development & Test: Starts in degraded state (API UP, Database DISCONNECTED)
+ *   so health diagnostics, offline tests, and documentation routes remain accessible.
  */
 export const connectDatabase = async (): Promise<boolean> => {
-  const mongoUri = env.MONGODB_URI;
+  const sanitized = getSanitizedDatabaseConfig(env.DB);
+  console.log(
+    `[Database] Initializing MySQL connection pool for "${sanitized.user}@${sanitized.host}:${sanitized.port}/${sanitized.database}" (limit: ${sanitized.connectionLimit})...`
+  );
 
-  if (!mongoUri) {
-    const message = 'MONGODB_URI environment variable is not defined.';
-    lastConnectionError = message;
-
-    if (env.NODE_ENV === 'production') {
-      console.error(`[Database FATAL] ${message} Persistent storage is mandatory in production.`);
-      throw new Error(message);
-    }
-
-    console.warn(`[Database WARNING] ${message} Running in degraded state (API UP, Database DISCONNECTED).`);
-    return false;
-  }
+  const currentPool = getPool();
+  const startTime = Date.now();
 
   try {
-    lastConnectionError = null;
-    const sanitized = sanitizeMongoUri(mongoUri);
-    console.log(`[Database] Connecting to MongoDB at ${sanitized}...`);
-
-    await mongoose.connect(mongoUri, {
-      autoIndex: env.NODE_ENV !== 'production', // Build indexes in dev/test, manage explicitly in prod
-      serverSelectionTimeoutMS: 5000,           // 5s timeout for fast feedback
-    });
-
-    const dbName = mongoose.connection.name || 'default';
-    const host = mongoose.connection.host || 'unknown-host';
-    console.log(`[Database] Successfully established MongoDB connection to "${dbName}" on ${host}.`);
-    return true;
+    const connection = await currentPool.getConnection();
+    try {
+      await connection.query('SELECT 1 AS connected');
+      isConnected = true;
+      lastConnectionError = null;
+      lastPingTime = new Date();
+      lastPingLatency = Date.now() - startTime;
+      console.log(
+        `[Database] Successfully established MySQL connection to "${sanitized.database}" at ${sanitized.host}:${sanitized.port} (${lastPingLatency}ms).`
+      );
+      return true;
+    } finally {
+      connection.release();
+    }
   } catch (error: unknown) {
-    const rawMessage = error instanceof Error ? error.message : String(error);
-    // Sanitize any accidental credentials in the error string
-    const safeError = sanitizeMongoUri(rawMessage);
+    isConnected = false;
+    const safeError = sanitizeDatabaseError(error);
     lastConnectionError = safeError;
 
     if (env.NODE_ENV === 'production') {
-      console.error(`[Database FATAL] Failed to connect to MongoDB: ${safeError}`);
-      throw new Error(`Failed to connect to MongoDB: ${safeError}`);
+      console.error(`[Database FATAL] Failed to connect to MySQL: ${safeError}`);
+      throw new Error(`Failed to connect to MySQL: ${safeError}`);
     }
 
-    console.warn(`[Database WARNING] Failed to connect to MongoDB (${safeError}). Running in degraded state.`);
+    console.warn(
+      `[Database WARNING] Failed to connect to MySQL (${safeError}). Running in degraded state (API UP, Database DISCONNECTED).`
+    );
     return false;
   }
 };
 
 /**
- * Closes the MongoDB database connection cleanly during graceful shutdown.
+ * Closes the MySQL pool cleanly during graceful shutdown.
  */
 export const disconnectDatabase = async (): Promise<void> => {
-  if (mongoose.connection.readyState !== 0) {
+  if (pool) {
     try {
-      await mongoose.disconnect();
-      console.log('[Database] MongoDB connection closed cleanly.');
-    } catch (err) {
-      console.error('[Database ERROR] Error occurred while closing MongoDB connection:', err);
+      console.log('[Database] Draining and closing MySQL connection pool...');
+      await pool.end();
+      pool = null;
+      isConnected = false;
+      console.log('[Database] MySQL connection pool closed cleanly.');
+    } catch (err: unknown) {
+      console.error('[Database ERROR] Error occurred while closing MySQL pool:', sanitizeDatabaseError(err));
     }
   }
 };
 
-// Listen for connection events to maintain telemetry accuracy
-mongoose.connection.on('disconnected', () => {
-  console.log('[Database] MongoDB connection dropped / disconnected.');
-});
+/**
+ * Executes a callback within a managed MySQL transaction.
+ * Automatically commits on success and rolls back on failure.
+ */
+export const withTransaction = async <T>(
+  callback: (connection: PoolConnection) => Promise<T>
+): Promise<T> => {
+  const currentPool = getPool();
+  const connection = await currentPool.getConnection();
 
-mongoose.connection.on('error', (err) => {
-  const safeMsg = sanitizeMongoUri(err?.message || 'Unknown database error');
-  lastConnectionError = safeMsg;
-  console.error('[Database ERROR] MongoDB runtime error:', safeMsg);
-});
+  try {
+    await connection.beginTransaction();
+    const result = await callback(connection);
+    await connection.commit();
+    return result;
+  } catch (error: unknown) {
+    try {
+      await connection.rollback();
+    } catch (rollbackError: unknown) {
+      console.error(
+        '[Database ERROR] Failed to rollback transaction:',
+        sanitizeDatabaseError(rollbackError)
+      );
+    }
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
