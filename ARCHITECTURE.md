@@ -94,153 +94,158 @@ erDiagram
     USER ||--o{ NOTIFICATION : receives
 
     USER {
-        ObjectId _id
-        string tenantId "default-library"
+        string id PK
+        string tenant_id "default-library"
         string email
-        string passwordHash
+        string password_hash
         string role "ADMIN | LIBRARIAN | MEMBER"
-        string fullName
-        string avatarUrl
-        boolean isActive
-        date lastLogin
-        date createdAt
+        string full_name
+        string avatar_url
+        boolean is_active
+        datetime last_login_at
+        datetime created_at
     }
 
     MEMBER {
-        ObjectId _id
-        string tenantId "default-library"
-        ObjectId userRef
-        string memberCode "MEM-2026-XXXX"
-        string memberType "STUDENT | FACULTY | RESEARCHER | GENERAL"
+        string id PK
+        string tenant_id "default-library"
+        string user_id FK "References users.id (nullable)"
+        string member_id "MEM-2026-XXXX"
+        string member_type "STUDENT | FACULTY | RESEARCHER | GENERAL"
         string department
-        int activeBorrowsCount
-        int maxBorrowLimit
-        boolean hasOverdueRestrictions
-        date membershipExpiry
+        int active_loans_count
+        int max_borrow_limit
+        boolean has_overdue_restrictions
+        datetime membership_expiry_date
     }
 
     BOOK {
-        ObjectId _id
-        string tenantId "default-library"
+        string id PK
+        string tenant_id "default-library"
         string isbn "Unique ISBN-10 or ISBN-13"
         string title
         string subtitle
-        string[] authors
+        json authors
         string publisher
         string category
-        int publicationYear
+        int publication_year
         string edition
-        int pages
+        string language
         string description
-        string coverImageUrl
-        string[] tags
-        int totalCopiesCount
-        int availableCopiesCount
-        int timesBorrowed
+        string cover_url
+        json tags
+        int total_copies
+        int available_copies
+        int times_borrowed
     }
 
     BOOK_COPY {
-        ObjectId _id
-        string tenantId "default-library"
-        ObjectId bookRef
-        int copyNumber
-        string copyCode "Unique LC-00124"
-        string barcode
-        string shelfLocation "e.g. Stack B3, Tier 2"
-        string condition "NEW | GOOD | FAIR | DAMAGED"
+        string id PK
+        string tenant_id "default-library"
+        string book_id FK "References books.id"
+        int copy_number
+        string copy_code "Unique LC-00124"
+        string barcode "Unique Barcode"
+        string shelf "e.g. Stack B3, Tier 2"
+        string location "Central University Library"
+        string condition_rating "NEW | GOOD | FAIR | DAMAGED"
         string status "AVAILABLE | BORROWED | RESERVED | MAINTENANCE | LOST | DAMAGED"
-        ObjectId currentBorrowerRef
-        date acquisitionDate
-        number purchasePrice
+        string current_holder_id
+        datetime acquisition_date
+        decimal acquisition_cost
     }
 
-    BORROW_TRANSACTION {
-        ObjectId _id
-        string tenantId "default-library"
-        ObjectId memberRef
-        ObjectId bookRef
-        ObjectId bookCopyRef
-        ObjectId issuedByRef
-        date issueDate
-        date dueDate
-        date returnDate
+    LOAN {
+        string id PK
+        string tenant_id "default-library"
+        string loan_number "Unique Loan Number"
+        string member_id FK "References members.id"
+        string book_id FK "References books.id"
+        string book_copy_id FK "References book_copies.id"
+        string copy_barcode
+        datetime checkout_date
+        datetime due_date
+        datetime return_date
         string status "ACTIVE | RETURNED | OVERDUE | LOST | DAMAGED"
-        int renewalCount
-        number fineCalculated
-        string notes
+        int renewal_count
+        decimal fine_calculated
+        string issued_by
     }
 
     RESERVATION {
-        ObjectId _id
-        string tenantId "default-library"
-        ObjectId bookRef
-        ObjectId memberRef
-        int queuePosition
+        string id PK
+        string tenant_id "default-library"
+        string reservation_number "Unique Hold Number"
+        string book_id FK "References books.id"
+        string member_id FK "References members.id"
+        int queue_position
         string status "WAITING | READY_FOR_PICKUP | CLAIMED | EXPIRED | CANCELLED"
-        date reservedAt
-        date claimWindowExpiresAt
-        ObjectId assignedCopyRef
+        datetime ready_at
+        datetime expires_at
+        string assigned_copy_id FK "References book_copies.id"
     }
 
     FINE {
-        ObjectId _id
-        string tenantId "default-library"
-        ObjectId transactionRef
-        ObjectId memberRef
-        number amount
-        int daysOverdue
-        string status "UNPAID | PAID | WAIVED"
-        date paidAt
-        string paymentMethod "CASH | CARD | ONLINE"
-        string waiverReason
-        ObjectId waivedByRef
+        string id PK
+        string tenant_id "default-library"
+        string fine_number "Unique Fine Number"
+        string loan_id FK "References loans.id"
+        string member_id FK "References members.id"
+        decimal original_amount
+        decimal amount_paid
+        decimal waived_amount
+        decimal balance
+        int days_overdue
+        string status "UNPAID | PARTIALLY_PAID | PAID | WAIVED"
     }
 
     NOTIFICATION {
-        ObjectId _id
-        string tenantId "default-library"
-        ObjectId recipientRef
+        string id PK
+        string tenant_id "default-library"
+        string recipient_id "Target User or Member ID"
+        string recipient_role "ADMIN | LIBRARIAN | MEMBER | ALL"
         string type "BOOK_ISSUED | DUE_SOON | OVERDUE | FINE_LEVIED | HOLD_READY | GENERAL"
         string title
         string message
-        string actionUrl
-        boolean isRead
-        date createdAt
+        string action_route
+        boolean is_read
+        datetime created_at
     }
 
     LIBRARY_SETTINGS {
-        ObjectId _id
-        string tenantId "default-library"
-        string libraryName
-        string logo
-        string primaryColor
-        string secondaryColor
-        string contactEmail
+        string id PK
+        string tenant_id "default-library"
+        string library_name
+        string logo_url
+        string primary_color
+        string secondary_color
+        string contact_email
         string phone
         string address
         string website
-        int maxBooksPerMember
-        int defaultBorrowDurationDays
-        int maxRenewalLimit
-        number finePerDay
-        int gracePeriodDays
-        number maxFineCap
-        int reservationExpiryHours
-        string currencySymbol
-        string operatingHours
+        int max_books_per_member
+        int default_borrow_duration_days
+        int max_renewal_limit
+        decimal fine_per_day
+        int grace_period_days
+        decimal max_fine_cap
+        int reservation_expiry_hours
+        string currency_symbol
+        string operating_hours
     }
 
     AUDIT_LOG {
-        ObjectId _id
-        string tenantId "default-library"
-        ObjectId actorId
-        string action "BOOK_ISSUE | BOOK_RETURN | FINE_WAIVE | ROLE_CHANGE | SETTINGS_CHANGE..."
-        string entityType "Book | BookCopy | BorrowTransaction | Reservation | Fine | User | Settings"
-        ObjectId entityId
-        object oldValue
-        object newValue
-        string ipAddress
-        date timestamp
+        string id PK
+        string tenant_id "default-library"
+        string actor_id
+        string actor_role "ADMIN | LIBRARIAN | MEMBER | SYSTEM"
+        string action "BOOK_ISSUE | BOOK_RETURN | FINE_WAIVE | ROLE_CHANGE | SETTINGS_CHANGE"
+        string entity_type "Book | BookCopy | Loan | Reservation | Fine | User | Settings"
+        string entity_id
+        json old_value
+        json new_value
+        string ip_address
+        datetime timestamp
     }
 ```
 
@@ -468,5 +473,5 @@ All 27 planned UI primitives must gracefully implement:
 4. **Defense in Depth:**
    - Helmet headers (`X-Content-Type-Options`, `X-Frame-Options`, strict CSP).
    - Rate limiting on authentication routes (maximum 5 failed login attempts per 15-minute window).
-   - Mongo query sanitization to eliminate NoSQL injection risks (`$gt`, `$where` filters).
+   - Parameterized SQL queries and prepared statements via mysql2 to eliminate SQL injection risks.
    - Centralized input schema validation on all POST/PUT payloads.

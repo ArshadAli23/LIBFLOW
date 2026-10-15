@@ -134,7 +134,7 @@ flowchart LR
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS + Centralized Design Tokens, Phosphor Icons / Clean SVGs, Framer Motion, Three.js / React Three Fiber (Isolated Hero Canvas).
 - **Backend:** Node.js v24 (LTS), Express.js, TypeScript, JWT, bcrypt / Argon2, node-cron.
 - **Database:** MySQL 8+, mysql2 with connection pooling, strict foreign keys, compound indexes, and version-controlled SQL migrations.
-- **Security:** Helmet, CORS Origin Validation, Express Rate Limit, Mongo Query Sanitization.
+- **Security:** Helmet, CORS Origin Validation, Express Rate Limit, Parameterized SQL Queries via mysql2.
 - **Testing:** Vitest, Supertest, React Testing Library, Postman Collections.
 
 ---

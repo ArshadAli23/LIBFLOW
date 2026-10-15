@@ -33,6 +33,14 @@ export interface SanitizedDatabaseEnvConfig {
   connectionLimit: number;
 }
 
+export interface AuthEnvConfig {
+  sessionCookieName: string;
+  sessionTtlHours: number;
+  resetTokenTtlMinutes: number;
+  rateLimitMaxAttempts: number;
+  rateLimitWindowMinutes: number;
+}
+
 export interface EnvConfig {
   NODE_ENV: 'development' | 'production' | 'test';
   PORT: number;
@@ -42,6 +50,7 @@ export interface EnvConfig {
   REQUEST_LIMIT: string;
   LOG_LEVEL: string;
   DB: DatabaseEnvConfig;
+  AUTH: AuthEnvConfig;
 }
 
 /**
@@ -166,6 +175,29 @@ if (!validation.valid) {
   }
 }
 
+const sessionTtlHoursParsed = Number.parseInt(process.env.SESSION_TTL_HOURS || '168', 10);
+const sessionTtlHours = Number.isFinite(sessionTtlHoursParsed) && sessionTtlHoursParsed > 0 ? sessionTtlHoursParsed : 168;
+
+const resetTokenTtlMinutesParsed = Number.parseInt(process.env.PASSWORD_RESET_TOKEN_TTL_MINUTES || '60', 10);
+const resetTokenTtlMinutes =
+  Number.isFinite(resetTokenTtlMinutesParsed) && resetTokenTtlMinutesParsed > 0 ? resetTokenTtlMinutesParsed : 60;
+
+const rateLimitMaxAttemptsParsed = Number.parseInt(process.env.AUTH_RATE_LIMIT_MAX || '5', 10);
+const rateLimitMaxAttempts =
+  Number.isFinite(rateLimitMaxAttemptsParsed) && rateLimitMaxAttemptsParsed > 0 ? rateLimitMaxAttemptsParsed : 5;
+
+const rateLimitWindowMinutesParsed = Number.parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MINUTES || '15', 10);
+const rateLimitWindowMinutes =
+  Number.isFinite(rateLimitWindowMinutesParsed) && rateLimitWindowMinutesParsed > 0 ? rateLimitWindowMinutesParsed : 15;
+
+const authConfig: AuthEnvConfig = {
+  sessionCookieName: (process.env.SESSION_COOKIE_NAME || 'libflow_session').trim(),
+  sessionTtlHours,
+  resetTokenTtlMinutes,
+  rateLimitMaxAttempts,
+  rateLimitWindowMinutes,
+};
+
 export const env: EnvConfig = {
   NODE_ENV: nodeEnv,
   PORT: safePort,
@@ -175,4 +207,5 @@ export const env: EnvConfig = {
   REQUEST_LIMIT: process.env.REQUEST_LIMIT || '1mb',
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
   DB: dbConfig,
+  AUTH: authConfig,
 };

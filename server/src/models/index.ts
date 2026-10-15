@@ -14,3 +14,6 @@ export * from './Fine.js';
 export * from './Notification.js';
 export * from './AuditLog.js';
 export * from './LibrarySettings.js';
+export * from './Session.js';
+export * from './PasswordReset.js';
+

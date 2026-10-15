@@ -11,9 +11,9 @@
     "start": "node dist/server.js",
     "migrate": "tsx src/db/migrator.ts migrate",
     "migrate:status": "tsx src/db/migrator.ts status",
-    "test": "tsx --test tests/database.unit.test.ts tests/domain.unit.test.ts tests/health.test.mjs tests/mysql.integration.test.ts",
-    "test:unit": "tsx --test tests/database.unit.test.ts tests/domain.unit.test.ts tests/health.test.mjs",
-    "test:integration": "tsx --test tests/mysql.integration.test.ts"
+    "test": "tsx --test tests/database.unit.test.ts tests/domain.unit.test.ts tests/health.test.mjs tests/auth.unit.test.ts tests/rbac.unit.test.ts tests/auth.api.test.ts tests/mysql.integration.test.ts tests/mysql.auth.integration.test.ts",
+    "test:unit": "tsx --test tests/database.unit.test.ts tests/domain.unit.test.ts tests/health.test.mjs tests/auth.unit.test.ts tests/rbac.unit.test.ts tests/auth.api.test.ts",
+    "test:integration": "tsx --test tests/mysql.integration.test.ts tests/mysql.auth.integration.test.ts"
   },
   "keywords": [
     "libflow",
@@ -24,6 +24,10 @@
   "author": "LIBFLOW Architecture Team",
   "license": "MIT",
   "dependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/cookie-parser": "^1.4.10",
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",

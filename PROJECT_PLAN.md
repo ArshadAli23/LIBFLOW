@@ -74,9 +74,9 @@ graph TD
   - Confirmed installed design skills and generated root `.gitignore`.
 
 - **Phase 1: Architecture, Data Schemas & Planning (COMPLETED)**
-  - Reconciled tech stack: React 19 + TS, Tailwind + Design Tokens, Node + Express + TS, MongoDB + Mongoose, node-cron.
+  - Reconciled tech stack: React 19 + TS, Tailwind + Design Tokens, Node + Express + TS, MySQL 8+ (mysql2), node-cron.
   - Standardized reservation state machine: `WAITING`, `READY_FOR_PICKUP`, `CLAIMED`, `EXPIRED`, `CANCELLED`.
-  - Documented complete Mongoose models with tenant readiness (`tenantId: "default-library"`).
+  - Documented relational data schemas and models with tenant readiness (`tenant_id: "default-library"`).
 
 - **Phase 2: Design System & Reusable Component Library (COMPLETED)**
   - Scaffolded Vite React 19 + TypeScript client in `client/`.
@@ -138,7 +138,7 @@ graph TD
   - Rule-based recommendation engine leveraging borrowing co-occurrence and category affinity.
 
 - **Phase 15: Security Hardening & Backend Hardening**
-  - Rate limiting, Helmet, Mongo sanitization, immutable `AuditLog` records for all mutations.
+  - Rate limiting, Helmet, parameterized SQL queries via mysql2, immutable `AuditLog` records for all mutations.
 
 - **Phase 16: Automated & Integration Testing**
   - Vitest + Supertest integration tests for circulation rules, borrowing quotas, and fine formulas.

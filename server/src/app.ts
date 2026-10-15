@@ -7,8 +7,10 @@
 import express, { type Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
 import healthRouter from './routes/health.routes.js';
+import authRouter from './routes/auth.routes.js';
 import { notFoundHandler } from './middleware/notFound.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { ApiResponse } from './utils/ApiResponse.js';
@@ -33,6 +35,9 @@ export const createApp = (): Application => {
   app.use(express.json({ limit: env.REQUEST_LIMIT }));
   app.use(express.urlencoded({ extended: true, limit: env.REQUEST_LIMIT }));
 
+  // 3b. Cookie Parsing for HttpOnly Sessions & CSRF
+  app.use(cookieParser());
+
   // 4. Root Welcome Route
   app.get('/', (_req, res) => {
     res.status(200).json(
@@ -46,6 +51,7 @@ export const createApp = (): Application => {
 
   // 5. Mount API Routes
   app.use(`${env.API_PREFIX}/health`, healthRouter);
+  app.use(`${env.API_PREFIX}/auth`, authRouter);
 
   // 6. Catch-all for Undefined Routes (404)
   app.use(notFoundHandler);

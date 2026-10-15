@@ -51,6 +51,14 @@ export const getPool = (): Pool => {
 };
 
 /**
+ * Sets or clears the active database pool for test suites.
+ */
+export const setPoolForTesting = (customPool: Pool | null): void => {
+  pool = customPool;
+};
+
+
+/**
  * Sanitizes any raw database error message to prevent accidental credential leakage.
  */
 export const sanitizeDatabaseError = (error: unknown, customPassword?: string): string => {
