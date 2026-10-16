@@ -137,8 +137,8 @@ export const requireMemberOwnership = (
     const isUserMatch = req.user.id === targetOwnerId;
     const isMemberMatch =
       req.memberProfile &&
-      typeof req.memberProfile.memberId === 'string' &&
-      req.memberProfile.memberId === targetOwnerId;
+      ((typeof req.memberProfile.memberId === 'string' && req.memberProfile.memberId === targetOwnerId) ||
+       (typeof req.memberProfile.id === 'string' && req.memberProfile.id === targetOwnerId));
 
     if (!isUserMatch && !isMemberMatch) {
       return next(

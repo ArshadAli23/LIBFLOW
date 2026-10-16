@@ -144,6 +144,7 @@ export class AuthService {
       if (memberRows && memberRows.length > 0) {
         const m = memberRows[0];
         memberProfile = {
+          id: m.id,
           memberId: m.member_id,
           memberType: m.member_type,
           department: m.department,
@@ -266,6 +267,7 @@ export class AuthService {
       if (memberRows && memberRows.length > 0) {
         const m = memberRows[0];
         memberProfile = {
+          id: m.id,
           memberId: m.member_id,
           memberType: m.member_type,
           department: m.department,

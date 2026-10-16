@@ -96,12 +96,38 @@ describe('Database Schema & Migration DDL Verification', () => {
   it('discovers and loads version-controlled migration files in order', async () => {
     const migrationsDir = path.resolve(__dirname, '../src/db/migrations');
     const files = await loadMigrationFiles(migrationsDir);
-    assert.ok(files.length >= 1);
+    assert.equal(files.length, 2, 'Must discover exactly 2 versioned migration files');
     assert.equal(files[0].version, '001');
     assert.equal(files[0].filename, '001_initial_schema.sql');
+    assert.equal(files[1].version, '002');
+    assert.equal(files[1].filename, '002_auth_and_sessions.sql');
 
     schemaSql = await fs.readFile(files[0].fullPath, 'utf8');
     assert.ok(schemaSql.length > 500);
+  });
+
+  it('verifies 002_auth_and_sessions.sql DDL, foreign keys, and seed accounts', async () => {
+    const migrationsDir = path.resolve(__dirname, '../src/db/migrations');
+    const authMigrationPath = path.join(migrationsDir, '002_auth_and_sessions.sql');
+    const authSql = await fs.readFile(authMigrationPath, 'utf8');
+
+    // 1. Verify tables
+    assert.ok(authSql.includes('CREATE TABLE IF NOT EXISTS sessions'));
+    assert.ok(authSql.includes('CREATE TABLE IF NOT EXISTS password_reset_tokens'));
+
+    // 2. Verify foreign keys
+    assert.ok(authSql.includes('CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE'));
+    assert.ok(authSql.includes('CONSTRAINT fk_pwd_reset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE'));
+
+    // 3. Verify unique indexes
+    assert.ok(authSql.includes('UNIQUE KEY uq_sessions_token_hash (session_token_hash)'));
+    assert.ok(authSql.includes('UNIQUE KEY uq_pwd_reset_token_hash (token_hash)'));
+
+    // 4. Verify seed accounts presence
+    assert.ok(authSql.includes('admin@libflow.io'));
+    assert.ok(authSql.includes('librarian@libflow.io'));
+    assert.ok(authSql.includes('student@libflow.io'));
+    assert.ok(authSql.includes('MB-2026-081'));
   });
 
   it('contains DDL for all 9 required relational domain tables and version tracker', () => {

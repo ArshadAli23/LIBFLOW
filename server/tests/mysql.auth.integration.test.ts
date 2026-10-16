@@ -134,4 +134,77 @@ describe('Live MySQL Authentication & Session Integration Tests (Requires Active
       await conn.end();
     }
   });
+
+  it('Live MySQL: verify full AuthService lifecycle (login, verifySession, logout) against real database', async () => {
+    const { AuthService } = await import('../src/services/AuthService.js');
+
+    // 1. Authenticate seed user student@libflow.io
+    const loginResult = await AuthService.login('student@libflow.io', 'MemberPass123!', {
+      ipAddress: '127.0.0.1',
+      userAgent: 'IntegrationTest/1.0',
+    });
+
+    assert.ok(loginResult.sessionToken, 'Must generate real session token');
+    assert.equal(loginResult.user.email, 'student@libflow.io');
+    assert.equal(loginResult.user.role, 'MEMBER');
+    assert.ok(loginResult.memberProfile, 'Must link to real member profile');
+    assert.equal(loginResult.memberProfile.memberId, 'MB-2026-081');
+
+    // 2. Verify session in real MySQL database
+    const verified = await AuthService.verifySession(loginResult.sessionToken);
+    assert.equal(verified.user.id, loginResult.user.id);
+    assert.equal(verified.session.userId, loginResult.user.id);
+
+    // 3. Logout -> removes from real sessions table
+    await AuthService.logout(loginResult.sessionToken, '127.0.0.1', 'IntegrationTest/1.0');
+
+    // 4. Verifying after logout must fail with UNAUTHORIZED
+    let error: any = null;
+    try {
+      await AuthService.verifySession(loginResult.sessionToken);
+    } catch (err) {
+      error = err;
+    }
+    assert.ok(error, 'Session must no longer be valid after logout');
+    assert.equal(error.statusCode, 401);
+  });
+
+  it('Live MySQL: verify real password reset and single-use enforcement in database', async () => {
+    const { AuthService } = await import('../src/services/AuthService.js');
+
+    // 1. Generate reset token in MySQL
+    const forgotResult = await AuthService.forgotPassword('librarian@libflow.io');
+    assert.ok(forgotResult.resetTokenForDev, 'Must issue reset token in dev/test');
+
+    const rawToken = forgotResult.resetTokenForDev;
+
+    // 2. Reset password in real MySQL
+    const tempPassword = 'NewStaffPassword2026!';
+    await AuthService.resetPassword(rawToken, tempPassword);
+
+    // 3. Single-use verification: reusing the same token must be rejected
+    let reuseError: any = null;
+    try {
+      await AuthService.resetPassword(rawToken, 'AnotherPassword2026!');
+    } catch (err) {
+      reuseError = err;
+    }
+    assert.ok(reuseError, 'Token cannot be reused');
+    assert.equal(reuseError.statusCode, 400);
+
+    // 4. Verify login with the new password in real MySQL
+    const newLogin = await AuthService.login('librarian@libflow.io', tempPassword);
+    assert.equal(newLogin.user.email, 'librarian@libflow.io');
+
+    // 5. Restore original password so database remains consistent
+    await AuthService.changePassword(
+      newLogin.user.id,
+      tempPassword,
+      'StaffPass123!',
+      newLogin.sessionToken
+    );
+
+    // Clean up session
+    await AuthService.logout(newLogin.sessionToken);
+  });
 });

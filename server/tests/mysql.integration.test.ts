@@ -85,21 +85,46 @@ describe('Live MySQL Database Integration Tests (Requires Running MySQL Server)'
     });
 
     try {
+      const rollbackUserId = `usr_tx_rollback_${Date.now()}`;
       await conn.beginTransaction();
       await conn.query(
-        "CREATE TEMPORARY TABLE test_tx_rollback (id INT PRIMARY KEY, val VARCHAR(50))"
+        "INSERT INTO users (id, tenant_id, email, password_hash, role, full_name, is_active) VALUES (?, 'default-library', ?, 'hash', 'MEMBER', 'Rollback User', 1)",
+        [rollbackUserId, `${rollbackUserId}@test.libflow.io`]
       );
-      await conn.query("INSERT INTO test_tx_rollback VALUES (1, 'temp-val')");
       await conn.rollback();
 
-      // Ensure transaction rolled back cleanly
-      await conn.beginTransaction();
-      const [tableCheck] = await conn.query<any[]>(
-        "SHOW TABLES LIKE 'test_tx_rollback'"
+      // Ensure transaction rolled back cleanly - row must not exist
+      const [rows] = await conn.query<any[]>(
+        'SELECT id FROM users WHERE id = ?',
+        [rollbackUserId]
       );
-      // In temporary table rollback or query
-      await conn.rollback();
-      assert.ok(true, 'Transaction rollback executed cleanly');
+      assert.equal(rows.length, 0, 'Inserted row must not persist after rollback');
+    } finally {
+      await conn.end();
+    }
+  });
+
+  it('Live MySQL: verify foreign key constraint rejection', async () => {
+    const conn = await mysql.createConnection({
+      host: env.DB.host,
+      port: env.DB.port,
+      user: env.DB.user,
+      password: env.DB.password,
+      database: env.DB.database,
+    });
+
+    try {
+      let rejected = false;
+      try {
+        await conn.query(
+          "INSERT INTO loans (id, tenant_id, loan_number, member_id, book_id, book_copy_id, copy_barcode, checkout_date, due_date, status) VALUES ('ln_invalid', 'default-library', 'LN-0000', 'mem_nonexistent', 'book_01', 'copy_01', 'LC-9999', NOW(), NOW(), 'ACTIVE')"
+        );
+      } catch (err: any) {
+        if (err.code === 'ER_NO_REFERENCED_ROW_2' || err.code === 'ER_NO_REFERENCED_ROW') {
+          rejected = true;
+        }
+      }
+      assert.ok(rejected, 'MySQL must reject insertion with invalid foreign key');
     } finally {
       await conn.end();
     }

@@ -11,6 +11,8 @@ import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
 import healthRouter from './routes/health.routes.js';
 import authRouter from './routes/auth.routes.js';
+import { bookRouter, bookCopyRouter } from './routes/book.routes.js';
+import { memberRouter } from './routes/member.routes.js';
 import { notFoundHandler } from './middleware/notFound.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { ApiResponse } from './utils/ApiResponse.js';
@@ -52,6 +54,9 @@ export const createApp = (): Application => {
   // 5. Mount API Routes
   app.use(`${env.API_PREFIX}/health`, healthRouter);
   app.use(`${env.API_PREFIX}/auth`, authRouter);
+  app.use(`${env.API_PREFIX}/books`, bookRouter);
+  app.use(`${env.API_PREFIX}/book-copies`, bookCopyRouter);
+  app.use(`${env.API_PREFIX}/members`, memberRouter);
 
   // 6. Catch-all for Undefined Routes (404)
   app.use(notFoundHandler);
