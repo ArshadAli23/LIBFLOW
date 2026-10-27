@@ -9,10 +9,11 @@
  *   if MySQL was not reached.
  */
 
-import { describe, it } from 'node:test';
+import { describe, it, after } from 'node:test';
 import assert from 'node:assert/strict';
 import mysql from 'mysql2/promise';
 import { env } from '../src/config/env.js';
+import { disconnectDatabase } from '../src/config/database.js';
 
 describe('Live MySQL Authentication & Session Integration Tests (Requires Active MySQL Server)', async () => {
   let isMySqlReachable = false;
@@ -206,5 +207,9 @@ describe('Live MySQL Authentication & Session Integration Tests (Requires Active
 
     // Clean up session
     await AuthService.logout(newLogin.sessionToken);
+  });
+
+  after(async () => {
+    await disconnectDatabase();
   });
 });

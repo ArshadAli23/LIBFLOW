@@ -15,7 +15,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   onForgotPassword,
   onSuccessLogin,
 }) => {
-  const { login } = useAuth();
+  const { login, authMode } = useAuth();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -24,7 +24,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // Canonical demo credentials for reviewers and evaluators
+  // Canonical credentials that match both demo mock accounts and MySQL seed migrations
   const handleFillDemo = (role: 'ADMIN' | 'LIBRARIAN' | 'MEMBER') => {
     setAuthError(null);
     setErrors({});
@@ -33,10 +33,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       setPassword('AdminPass123!');
     } else if (role === 'LIBRARIAN') {
       setIdentifier('librarian@libflow.demo');
-      setPassword('Circulation2026!');
+      setPassword('StaffPass123!');
     } else {
       setIdentifier('member@libflow.demo');
-      setPassword('LibraryPass2026!');
+      setPassword('MemberPass123!');
     }
   };
 
@@ -63,8 +63,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     setErrors({});
     setIsLoading(true);
 
-    // Call mock auth service
-    const result = await login(identifier);
+    // Call auth service (supports both live backend API and demo mode)
+    const result = await login(identifier, password);
     setIsLoading(false);
 
     if (result.success) {
@@ -77,19 +77,30 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     } else {
       setAuthError(
         result.error ||
-          'Unrecognized credentials. Please use admin@libflow.demo, librarian@libflow.demo, or member@libflow.demo.'
+          (authMode === 'live'
+            ? 'Authentication failed. Please check your credentials.'
+            : 'Unrecognized credentials. Please use admin@libflow.demo, librarian@libflow.demo, or member@libflow.demo.')
       );
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* Demo Credentials Helper Pill */}
+      {/* Seed Credentials Helper Pill */}
       <div className="p-3 rounded-xl bg-canvas-subtle border border-border-subtle space-y-2">
         <div className="flex items-center justify-between text-[11px] font-mono text-canvas-muted">
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1.5">
             <KeyRound className="w-3 h-3 text-brand-accent" />
-            <span>Demo Quick-Fill:</span>
+            <span>Seed Credentials:</span>
+            {authMode === 'live' ? (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                Live Backend
+              </span>
+            ) : (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                Demo Mode
+              </span>
+            )}
           </span>
           <span>Click to populate</span>
         </div>

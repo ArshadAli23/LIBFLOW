@@ -1,14 +1,14 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Loan } from '../types';
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, AlertTriangle } from 'lucide-react';
 
 export interface RenewLoanModalProps {
   loan: Loan | null;
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (loanId: string) => void;
+  onConfirm: (loanId: string) => void | Promise<void>;
 }
 
 export const RenewLoanModal: React.FC<RenewLoanModalProps> = ({
@@ -17,6 +17,9 @@ export const RenewLoanModal: React.FC<RenewLoanModalProps> = ({
   onClose,
   onConfirm,
 }) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const nowMs = useMemo(() => Date.now(), [isOpen]);
+
   if (!loan) return null;
 
   const currentDueDate = new Date(loan.dueDate);
@@ -27,16 +30,25 @@ export const RenewLoanModal: React.FC<RenewLoanModalProps> = ({
 
   const nextRenewalNum = loan.renewalCount + 1;
   const isAtCeiling = loan.renewalCount >= loan.maxRenewals;
+  const isOverdue =
+    loan.status === 'OVERDUE' ||
+    (loan.status === 'ACTIVE' && new Date(loan.dueDate).getTime() < nowMs);
 
-  const handleConfirm = () => {
-    onConfirm(loan.id);
-    onClose();
+  const handleConfirm = async () => {
+    if (isSubmitting || isAtCeiling || isOverdue) return;
+    setIsSubmitting(true);
+    try {
+      await onConfirm(loan.id);
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={isSubmitting ? () => {} : onClose}
       title="Extend Loan (Renewal)"
       description={`Grant 14-day circulation extension for volume barcode ${loan.copyBarcode}.`}
       size="md"
@@ -92,14 +104,27 @@ export const RenewLoanModal: React.FC<RenewLoanModalProps> = ({
           </div>
         </div>
 
-        {isAtCeiling && (
+        {isOverdue ? (
+          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>
+              This loan is past its due date. Overdue items cannot be renewed self-service; please check in this volume at the circulation desk.
+            </span>
+          </div>
+        ) : isAtCeiling ? (
           <p className="text-xs text-rose-600 font-medium">
             This loan has already utilized the maximum number of allowable extensions ({loan.maxRenewals}).
           </p>
-        )}
+        ) : null}
 
         <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border-subtle">
-          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
             Cancel
           </Button>
           <Button
@@ -107,10 +132,10 @@ export const RenewLoanModal: React.FC<RenewLoanModalProps> = ({
             variant="primary"
             size="sm"
             onClick={handleConfirm}
-            disabled={isAtCeiling}
-            leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
+            disabled={isAtCeiling || isOverdue || isSubmitting}
+            leftIcon={<RotateCcw className={`w-3.5 h-3.5 ${isSubmitting ? 'animate-spin' : ''}`} />}
           >
-            Confirm Renewal (+14 Days)
+            {isSubmitting ? 'Renewing...' : 'Confirm Renewal (+14 Days)'}
           </Button>
         </div>
       </div>

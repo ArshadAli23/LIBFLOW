@@ -180,7 +180,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
         {/* Modal Footer */}
         <div className="px-4 py-2 border-t border-border-subtle bg-canvas-subtle/30 flex items-center justify-between text-[11px] font-mono text-canvas-muted">
           <span>Search scope: Central Catalog & Member Ledger</span>
-          <span>Mock Demonstration Data</span>
+          <span>Quick Navigation & Jump</span>
         </div>
       </div>
     </div>

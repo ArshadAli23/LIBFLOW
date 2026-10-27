@@ -3,7 +3,9 @@ import { useMembers } from '../../features/members/MembersContext';
 import type { MemberType, MemberStatus } from '../../features/members/types';
 import { FormField, Input, Select } from '../../components/forms/FormControls';
 import { Button } from '../../components/ui/Button';
+import { Alert } from '../../components/feedback/FeedbackStates';
 import { useToast } from '../../context/ToastContext';
+import { ApiClientError } from '../../lib/api/types';
 import {
   ArrowLeft,
   UserPlus,
@@ -51,6 +53,7 @@ export const AddMemberPage: React.FC<AddMemberPageProps> = ({ onNavigate }) => {
 
   // Errors state
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [apiError, setApiError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validate = (): boolean => {
@@ -73,7 +76,7 @@ export const AddMemberPage: React.FC<AddMemberPageProps> = ({ onNavigate }) => {
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) {
       addToast({
@@ -85,8 +88,10 @@ export const AddMemberPage: React.FC<AddMemberPageProps> = ({ onNavigate }) => {
     }
 
     setIsSubmitting(true);
+    setApiError(null);
+
     try {
-      const created = addMember({
+      const created = await addMember({
         memberId: generatedMemberId,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -110,12 +115,18 @@ export const AddMemberPage: React.FC<AddMemberPageProps> = ({ onNavigate }) => {
       });
 
       onNavigate(`admin/members/${created.id}`);
-    } catch {
+    } catch (err) {
+      const message =
+        err instanceof ApiClientError
+          ? err.message
+          : (err as Error).message || 'An error occurred while creating the member record.';
+      setApiError(message);
       addToast({
         title: 'Registration Error',
-        message: 'An error occurred while creating the member record.',
+        message,
         type: 'error',
       });
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -174,6 +185,15 @@ export const AddMemberPage: React.FC<AddMemberPageProps> = ({ onNavigate }) => {
           </Button>
         </div>
       </div>
+
+      {/* Registration API Error Banner */}
+      {apiError && (
+        <Alert
+          variant="error"
+          title="Registration Failed"
+          description={apiError}
+        />
+      )}
 
       {/* 2-Column Desktop Layout: Form on Left, Live Smartcard Preview on Right */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">

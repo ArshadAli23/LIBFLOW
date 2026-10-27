@@ -80,7 +80,7 @@ export const ChangeStatusModal: React.FC<ChangeStatusModalProps> = ({
             onChange={(e) => setSelectedStatus(e.target.value as MemberStatus)}
             options={[
               { value: 'ACTIVE', label: 'ACTIVE — Unrestricted borrowing & reservation access' },
-              { value: 'SUSPENDED', label: 'SUSPENDED — Block checkout terminal privileges' },
+              { value: 'SUSPENDED', label: 'SUSPENDED — Block checkout and borrowing privileges' },
               { value: 'EXPIRED', label: 'EXPIRED — Subscription / Academic term ended' },
               { value: 'PENDING', label: 'PENDING — Under registrar or advisor review' },
             ]}

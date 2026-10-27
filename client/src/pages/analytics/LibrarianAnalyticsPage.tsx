@@ -137,7 +137,7 @@ export const LibrarianAnalyticsPage: React.FC<LibrarianAnalyticsPageProps> = ({ 
         <AnalyticsMetric
           label="Today's Checkouts"
           value={operationalSummary.todayCheckouts}
-          subtext="Volumes issued at counter terminal today"
+          subtext="Volumes issued at circulation desk today"
           variant="brand"
           icon={<Repeat className="w-4 h-4 text-brand" />}
         />
@@ -182,7 +182,7 @@ export const LibrarianAnalyticsPage: React.FC<LibrarianAnalyticsPageProps> = ({ 
               </p>
             </div>
             <span className="text-[11px] font-mono text-canvas-muted px-2 py-0.5 rounded bg-canvas-subtle border border-border-subtle self-start sm:self-auto">
-              Terminal Shift Throughput
+              Desk Shift Throughput
             </span>
           </div>
 

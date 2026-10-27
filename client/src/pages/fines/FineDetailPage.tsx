@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFines } from '../../features/fines/FinesContext';
+import type { Fine } from '../../features/fines/types';
 import { FineStatusBadge } from '../../features/fines/components/FineStatusBadge';
 import { FineAmount } from '../../features/fines/components/FineAmount';
 import { BookCover } from '../../features/books/components/BookCover';
@@ -18,6 +19,7 @@ import {
   BookOpen,
   Receipt,
   CheckCircle2,
+  RefreshCw,
 } from 'lucide-react';
 
 export interface FineDetailPageProps {
@@ -26,17 +28,111 @@ export interface FineDetailPageProps {
 }
 
 export const FineDetailPage: React.FC<FineDetailPageProps> = ({ fineId, onNavigate }) => {
-  const { getFineById, recordPayment, waiveFine, policy } = useFines();
+  const { getFineById, fetchFineById, recordPayment, waiveFine, policy } = useFines();
   const { addToast } = useToast();
-  const { role } = useAuth();
+  const { role, authMode } = useAuth();
   const isAdmin = role === 'ADMIN';
 
   const basePath = isAdmin ? 'admin/fines' : 'librarian/fines';
 
-  const fine = getFineById(fineId);
-
+  const [fine, setFine] = useState<Fine | undefined>(() => getFineById(fineId));
+  const [isLoading, setIsLoading] = useState<boolean>(!fine && authMode === 'live');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isWaiveModalOpen, setIsWaiveModalOpen] = useState(false);
+
+  // Sync / fetch fresh fine record including payments & waivers
+  useEffect(() => {
+    let active = true;
+
+    const loadData = async () => {
+      const existing = getFineById(fineId);
+      if (existing) {
+        setFine(existing);
+      }
+
+      if (authMode === 'live') {
+        setIsLoading(true);
+        try {
+          const fetched = await fetchFineById(fineId);
+          if (active && fetched) {
+            setFine(fetched);
+          }
+        } catch {
+          // Handled in fetchFineById
+        } finally {
+          if (active) setIsLoading(false);
+        }
+      }
+    };
+
+    loadData();
+
+    return () => {
+      active = false;
+    };
+  }, [fineId, authMode, getFineById, fetchFineById]);
+
+  const handleConfirmPayment = async (
+    fId: string,
+    amount: number,
+    method: Parameters<typeof recordPayment>[2],
+    reference?: string,
+    notes?: string
+  ) => {
+    try {
+      const updated = await recordPayment(fId, amount, method, reference, notes);
+      if (updated) {
+        setFine(updated);
+        addToast({
+          title: 'Payment Recorded',
+          message: `Collected ${formatCurrency(amount, policy.currencySymbol)} from ${updated.memberName}. Remaining balance: ${formatCurrency(updated.balance, policy.currencySymbol)}.`,
+          type: 'success',
+        });
+      }
+    } catch (err: any) {
+      addToast({
+        title: 'Payment Failed',
+        message: err?.message || 'Could not record fine payment.',
+        type: 'error',
+      });
+      throw err;
+    }
+  };
+
+  const handleConfirmWaiver = async (
+    fId: string,
+    amount: number,
+    reason: string,
+    waivedBy: string
+  ) => {
+    try {
+      const updated = await waiveFine(fId, amount, reason, waivedBy);
+      if (updated) {
+        setFine(updated);
+        addToast({
+          title: 'Fine Waived',
+          message: `Authorized waiver of ${formatCurrency(amount, policy.currencySymbol)} for ${updated.memberName}.`,
+          type: 'info',
+        });
+      }
+    } catch (err: any) {
+      addToast({
+        title: 'Waiver Failed',
+        message: err?.message || 'Could not authorize fine waiver.',
+        type: 'error',
+      });
+      throw err;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="max-w-xl mx-auto p-12 rounded-2xl border border-border-subtle bg-surface text-center space-y-4 shadow-card">
+        <RefreshCw className="w-6 h-6 animate-spin text-brand mx-auto" />
+        <p className="text-xs font-mono text-canvas-muted">Loading fine details from institutional ledger...</p>
+      </div>
+    );
+  }
 
   if (!fine) {
     return (
@@ -51,39 +147,6 @@ export const FineDetailPage: React.FC<FineDetailPageProps> = ({ fineId, onNaviga
       </div>
     );
   }
-
-  const handleConfirmPayment = (
-    fId: string,
-    amount: number,
-    method: Parameters<typeof recordPayment>[2],
-    reference?: string,
-    notes?: string
-  ) => {
-    const updated = recordPayment(fId, amount, method, reference, notes);
-    if (updated) {
-      addToast({
-        title: 'Payment Recorded',
-        message: `Collected ${formatCurrency(amount, policy.currencySymbol)} from ${updated.memberName}.`,
-        type: 'success',
-      });
-    }
-  };
-
-  const handleConfirmWaiver = (
-    fId: string,
-    amount: number,
-    reason: string,
-    waivedBy: string
-  ) => {
-    const updated = waiveFine(fId, amount, reason, waivedBy);
-    if (updated) {
-      addToast({
-        title: 'Fine Waived',
-        message: `Authorized waiver of ${formatCurrency(amount, policy.currencySymbol)} for ${updated.memberName}.`,
-        type: 'info',
-      });
-    }
-  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 animate-in fade-in duration-200">

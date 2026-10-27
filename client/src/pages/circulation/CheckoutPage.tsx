@@ -25,10 +25,10 @@ export interface CheckoutPageProps {
 
 export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onNavigate }) => {
   const { members, getMemberById } = useMembers();
-  const { books, copies } = useBooks();
+  const { books, copies, fetchCopiesForBook } = useBooks();
   const { checkoutBook, policy } = useCirculation();
   const { addToast } = useToast();
-  const { user, role } = useAuth();
+  const { user, role, authMode } = useAuth();
   const isAdmin = role === 'ADMIN';
 
   const basePath = isAdmin ? 'admin/circulation' : 'librarian/circulation';
@@ -49,6 +49,13 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onNavigate }) => {
   const [selectedCopy, setSelectedCopy] = useState<BookCopy | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [issuedLoanSuccess, setIssuedLoanSuccess] = useState<Loan | null>(null);
+
+  // Auto-fetch copies for selected book in live mode
+  useEffect(() => {
+    if (selectedBook && authMode === 'live') {
+      fetchCopiesForBook(selectedBook.id);
+    }
+  }, [selectedBook, authMode, fetchCopiesForBook]);
 
   // Auto-select member if query param provided
   useEffect(() => {
@@ -72,17 +79,21 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onNavigate }) => {
     );
   }, [members, memberSearch]);
 
-  // Filter books
+  // Filter books (matches title, author, ISBN, or physical copy barcode)
   const filteredBooks = useMemo(() => {
     if (!bookSearch.trim()) return [];
-    const q = bookSearch.toLowerCase();
+    const q = bookSearch.trim().toLowerCase();
+    const matchingCopyBookIds = new Set(
+      copies.filter((c) => c.barcode.toLowerCase().includes(q)).map((c) => c.bookId)
+    );
     return books.filter(
       (b) =>
         b.title.toLowerCase().includes(q) ||
         b.authors.some((a) => a.toLowerCase().includes(q)) ||
-        b.isbn.includes(q)
+        b.isbn.toLowerCase().includes(q) ||
+        matchingCopyBookIds.has(b.id)
     );
-  }, [books, bookSearch]);
+  }, [books, copies, bookSearch]);
 
   // Available copies of selected book
   const availableCopies = useMemo(() => {
@@ -118,7 +129,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onNavigate }) => {
   }, [selectedMember, memberQuota]);
 
   // Execute checkout
-  const handleConfirmCheckout = () => {
+  const handleConfirmCheckout = async () => {
     if (!selectedMember || !selectedBook || !selectedCopy) return;
 
     if (memberEligibilityError) {
@@ -131,7 +142,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onNavigate }) => {
     }
 
     setIsSubmitting(true);
-    const result = checkoutBook({
+    const result = await checkoutBook({
       memberId: selectedMember.id,
       bookId: selectedBook.id,
       bookCopyId: selectedCopy.id,
@@ -165,9 +176,11 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onNavigate }) => {
     setIsSubmitting(false);
   };
 
-  const now = new Date();
-  const dueDate = new Date(now.getTime() + policy.loanDurationDays * 24 * 60 * 60 * 1000);
-  const dueDateStr = dueDate.toISOString().split('T')[0];
+  const [baseTimeMs] = useState(() => Date.now());
+  const dueDateStr = useMemo(() => {
+    const d = new Date(baseTimeMs + policy.loanDurationDays * 24 * 60 * 60 * 1000);
+    return d.toISOString().split('T')[0];
+  }, [baseTimeMs, policy.loanDurationDays]);
 
   // Visual active step indicator (1, 2, or 3)
   const currentStep = !selectedMember ? 1 : !selectedCopy ? 2 : 3;
@@ -189,7 +202,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onNavigate }) => {
           <div className="h-4 w-px bg-border-subtle" />
           <div>
             <h1 className="text-xl sm:text-2xl font-serif font-bold text-canvas-text tracking-tight">
-              Circulation Terminal — Issue Book
+              Circulation Desk — Issue Book
             </h1>
             <p className="text-xs text-canvas-muted">
               Fast-track patron credential lookup, barcode copy binding, and automated due-date stamping.

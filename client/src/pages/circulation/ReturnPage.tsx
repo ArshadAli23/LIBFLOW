@@ -5,6 +5,7 @@ import { BookCover } from '../../features/books/components/BookCover';
 import { Button } from '../../components/ui/Button';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../auth/AuthContext';
+import { loansApi, mapApiLoanToLoan } from '../../lib/api/loans';
 import {
   ArrowLeft,
   ArrowDownLeft,
@@ -21,7 +22,7 @@ export interface ReturnPageProps {
 export const ReturnPage: React.FC<ReturnPageProps> = ({ onNavigate }) => {
   const { loans, returnBook } = useCirculation();
   const { addToast } = useToast();
-  const { user, role } = useAuth();
+  const { user, role, authMode } = useAuth();
   const isAdmin = role === 'ADMIN';
 
   const basePath = isAdmin ? 'admin/circulation' : 'librarian/circulation';
@@ -55,7 +56,7 @@ export const ReturnPage: React.FC<ReturnPageProps> = ({ onNavigate }) => {
   }, [loans]);
 
   // Handle direct barcode search or hit Enter
-  const handleBarcodeSubmit = (e: React.FormEvent) => {
+  const handleBarcodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!barcodeInput.trim()) return;
 
@@ -70,13 +71,42 @@ export const ReturnPage: React.FC<ReturnPageProps> = ({ onNavigate }) => {
     if (match) {
       setSelectedLoan(match);
       setBarcodeInput('');
-    } else {
-      addToast({
-        title: 'Barcode Not Found',
-        message: `No active borrowing loan matching barcode "${barcodeInput}".`,
-        type: 'error',
-      });
+      return;
     }
+
+    // In live mode, query database if not found in current local page
+    if (authMode === 'live') {
+      try {
+        setIsSubmitting(true);
+        const res = await loansApi.listLoans({ search: barcodeInput.trim() });
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          const mapped = res.data.map(mapApiLoanToLoan);
+          const activeMatch =
+            mapped.find(
+              (l) =>
+                (l.copyBarcode.toLowerCase() === q || l.loanNumber.toLowerCase() === q || l.id.toLowerCase() === q) &&
+                (l.status === 'ACTIVE' || l.status === 'OVERDUE')
+            ) || mapped.find((l) => l.status === 'ACTIVE' || l.status === 'OVERDUE');
+
+          if (activeMatch) {
+            setSelectedLoan(activeMatch);
+            setBarcodeInput('');
+            setIsSubmitting(false);
+            return;
+          }
+        }
+      } catch {
+        // Fall through to error toast
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+
+    addToast({
+      title: 'Barcode Not Found',
+      message: `No active borrowing loan matching barcode "${barcodeInput}".`,
+      type: 'error',
+    });
   };
 
   // Calculate overdue days
@@ -92,11 +122,11 @@ export const ReturnPage: React.FC<ReturnPageProps> = ({ onNavigate }) => {
     selectedLoan &&
     (selectedLoan.status === 'OVERDUE' || overdueDays > 0);
 
-  const handleConfirmReturn = () => {
+  const handleConfirmReturn = async () => {
     if (!selectedLoan) return;
 
     setIsSubmitting(true);
-    const result = returnBook({
+    const result = await returnBook({
       loanId: selectedLoan.id,
       returnedTo: user?.name || 'Circulation Desk Staff',
     });
@@ -107,9 +137,14 @@ export const ReturnPage: React.FC<ReturnPageProps> = ({ onNavigate }) => {
         wasOverdue: !!result.wasOverdue,
       });
 
+      const fineNotice =
+        result.fineAssessed && result.fineAssessed > 0
+          ? ` Overdue fine of ₹${result.fineAssessed.toFixed(2)} assessed.`
+          : '';
+
       addToast({
         title: 'Book Check-in Recorded',
-        message: `Volume ${result.loan.copyBarcode} returned to shelf ${result.loan.copyShelf}.`,
+        message: `Volume ${result.loan.copyBarcode} returned to shelf ${result.loan.copyShelf}.${fineNotice}`,
         type: 'success',
       });
     } else {
@@ -146,7 +181,7 @@ export const ReturnPage: React.FC<ReturnPageProps> = ({ onNavigate }) => {
           <div className="h-4 w-px bg-border-subtle" />
           <div>
             <h1 className="text-xl sm:text-2xl font-serif font-bold text-canvas-text tracking-tight">
-              Circulation Terminal — Book Return Intake
+              Circulation Desk — Book Return Intake
             </h1>
             <p className="text-xs text-canvas-muted">
               Scan barcode, verify book copy condition, check overdue status, and restage to stacks.

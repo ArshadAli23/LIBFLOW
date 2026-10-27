@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { Loan } from '../types';
 import { LoanStatusBadge } from './LoanStatusBadge';
 import { Button } from '../../../components/ui/Button';
@@ -21,6 +21,8 @@ export const LoanTable: React.FC<LoanTableProps> = ({
   onViewBook,
   canManage = true,
 }) => {
+  const nowMs = useMemo(() => Date.now(), []);
+
   if (loans.length === 0) {
     return (
       <EmptyState
@@ -34,8 +36,7 @@ export const LoanTable: React.FC<LoanTableProps> = ({
   const getDueStatusText = (dueDate: string, status: string) => {
     if (status === 'RETURNED') return 'Returned';
     const dueTime = new Date(dueDate).getTime();
-    const nowTime = Date.now();
-    const diffDays = Math.ceil((dueTime - nowTime) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.ceil((dueTime - nowMs) / (1000 * 60 * 60 * 24));
 
     if (diffDays < 0) return `${Math.abs(diffDays)}d overdue`;
     if (diffDays === 0) return 'Due today';
@@ -66,7 +67,7 @@ export const LoanTable: React.FC<LoanTableProps> = ({
               {loans.map((loan) => {
                 const isOverdue =
                   loan.status === 'OVERDUE' ||
-                  (loan.status === 'ACTIVE' && new Date(loan.dueDate).getTime() < Date.now());
+                  (loan.status === 'ACTIVE' && new Date(loan.dueDate).getTime() < nowMs);
                 const dueText = getDueStatusText(loan.dueDate, loan.status);
 
                 return (
@@ -210,7 +211,7 @@ export const LoanTable: React.FC<LoanTableProps> = ({
         {loans.map((loan) => {
           const isOverdue =
             loan.status === 'OVERDUE' ||
-            (loan.status === 'ACTIVE' && new Date(loan.dueDate).getTime() < Date.now());
+            (loan.status === 'ACTIVE' && new Date(loan.dueDate).getTime() < nowMs);
           const dueText = getDueStatusText(loan.dueDate, loan.status);
 
           return (

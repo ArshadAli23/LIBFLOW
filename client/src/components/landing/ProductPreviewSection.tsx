@@ -40,20 +40,22 @@ export const ProductPreviewSection: React.FC<ProductPreviewSectionProps> = ({
             rightIcon={<ExternalLink className="w-4 h-4" />}
             className="self-start sm:self-auto text-xs"
           >
-            Launch Interactive OS Shell
+            Launch Interactive Dashboard
           </Button>
         </div>
 
         {/* Dashboard Frame Preview */}
         <div className="rounded-3xl border border-border-subtle bg-surface shadow-modal overflow-hidden">
-          {/* Top Mock Window Bar */}
+          {/* Top Interface Bar */}
           <div className="px-5 py-3.5 border-b border-border-subtle bg-canvas-subtle/70 flex items-center justify-between text-xs select-none">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
-              <span className="ml-3 font-mono text-[11px] text-canvas-muted">
-                app.libflow.internal / circulation-telemetry
+            <div className="flex items-center gap-2.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-semibold text-canvas-text font-sans">
+                Circulation & Inventory Overview
+              </span>
+              <span className="text-canvas-muted text-xs hidden sm:inline">•</span>
+              <span className="hidden sm:inline text-xs font-mono text-canvas-muted">
+                Live Multi-Copy Telemetry
               </span>
             </div>
 

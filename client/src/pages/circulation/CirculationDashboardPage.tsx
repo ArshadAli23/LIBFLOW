@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useCirculation } from '../../features/circulation/CirculationContext';
 import type { Loan, CirculationFilterState } from '../../features/circulation/types';
 import { LoanTable } from '../../features/circulation/components/LoanTable';
@@ -6,6 +6,8 @@ import { RenewLoanModal } from '../../features/circulation/components/RenewLoanM
 import { SearchInput } from '../../components/forms/FormControls';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../auth/AuthContext';
+import { Button } from '../../components/ui/Button';
+import { Alert, Spinner } from '../../components/feedback/FeedbackStates';
 import {
   Repeat,
   ArrowDownLeft,
@@ -15,6 +17,7 @@ import {
   Sparkles,
   ArrowRight,
   ShieldCheck,
+  RefreshCw,
 } from 'lucide-react';
 
 export interface CirculationDashboardPageProps {
@@ -24,9 +27,9 @@ export interface CirculationDashboardPageProps {
 export const CirculationDashboardPage: React.FC<CirculationDashboardPageProps> = ({
   onNavigate,
 }) => {
-  const { loans, renewLoan } = useCirculation();
+  const { loans, renewLoan, isLoading, error, fetchLoans, clearError } = useCirculation();
   const { addToast } = useToast();
-  const { role, user } = useAuth();
+  const { role, user, authMode } = useAuth();
   const isAdmin = role === 'ADMIN';
 
   const basePath = isAdmin ? 'admin/circulation' : 'librarian/circulation';
@@ -59,6 +62,19 @@ export const CirculationDashboardPage: React.FC<CirculationDashboardPageProps> =
 
     return { active, overdue, dueToday, returnsToday, returnRatePct };
   }, [loans]);
+
+  // LIVE MODE: Debounced fetchLoans when status or search changes
+  useEffect(() => {
+    if (authMode === 'live') {
+      const timer = setTimeout(() => {
+        fetchLoans({
+          search: filterState.search.trim() || undefined,
+          status: filterState.status,
+        });
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [authMode, filterState.search, filterState.status, fetchLoans]);
 
   // Dynamic Today's Activity Stream (Section 5 Requirement)
   const todaysActivityStream = useMemo(() => {
@@ -106,6 +122,9 @@ export const CirculationDashboardPage: React.FC<CirculationDashboardPageProps> =
 
   // Filtered loans list
   const filteredLoans = useMemo(() => {
+    if (authMode === 'live') {
+      return loans;
+    }
     return loans.filter((loan) => {
       // Search
       if (filterState.search.trim()) {
@@ -126,14 +145,14 @@ export const CirculationDashboardPage: React.FC<CirculationDashboardPageProps> =
 
       return true;
     });
-  }, [loans, filterState]);
+  }, [loans, filterState, authMode]);
 
   const handleReturnDirect = (loan: Loan) => {
     onNavigate(`${basePath}/return?loanId=${loan.id}`);
   };
 
-  const handleConfirmRenew = (loanId: string) => {
-    const res = renewLoan(loanId);
+  const handleConfirmRenew = async (loanId: string) => {
+    const res = await renewLoan(loanId);
     if (res.success && res.loan) {
       addToast({
         title: 'Loan Extended',
@@ -147,6 +166,11 @@ export const CirculationDashboardPage: React.FC<CirculationDashboardPageProps> =
         type: 'error',
       });
     }
+  };
+
+  const handleRetry = () => {
+    clearError();
+    fetchLoans();
   };
 
   return (
@@ -166,12 +190,39 @@ export const CirculationDashboardPage: React.FC<CirculationDashboardPageProps> =
         </div>
 
         <div className="flex items-center gap-2.5 self-start md:self-auto font-mono text-xs">
+          {authMode === 'live' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />}
+              onClick={handleRetry}
+              disabled={isLoading}
+              className="text-xs"
+            >
+              Sync
+            </Button>
+          )}
+
           <span className="px-3 py-1.5 rounded-full bg-surface border border-border-subtle text-canvas-text flex items-center gap-2 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Counter Terminal Live</span>
+            <span>Circulation Desk Active</span>
           </span>
         </div>
       </div>
+
+      {/* Error Alert Banner in Live Mode */}
+      {error && (
+        <Alert
+          variant="error"
+          title="Circulation Synchronization Error"
+          description={error}
+          action={
+            <Button variant="secondary" size="sm" onClick={handleRetry} leftIcon={<RefreshCw className="w-3.5 h-3.5" />}>
+              Retry Query
+            </Button>
+          }
+        />
+      )}
 
       {/* Asymmetric Hero: Primary Metric + Supporting Metrics + Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -398,13 +449,20 @@ export const CirculationDashboardPage: React.FC<CirculationDashboardPageProps> =
         </div>
 
         {/* Loan Table */}
-        <LoanTable
-          loans={filteredLoans}
-          onReturnLoan={handleReturnDirect}
-          onRenewLoan={(loan) => setSelectedLoanForRenew(loan)}
-          onViewBook={(bookId) => onNavigate(`admin/collection/books/${bookId}`)}
-          canManage={true}
-        />
+        {isLoading && filteredLoans.length === 0 ? (
+          <div className="py-20 flex flex-col items-center justify-center space-y-3 bg-surface/50 rounded-2xl border border-border-subtle">
+            <Spinner size="lg" />
+            <p className="text-xs text-canvas-muted font-mono">Synchronizing circulation ledger...</p>
+          </div>
+        ) : (
+          <LoanTable
+            loans={filteredLoans}
+            onReturnLoan={handleReturnDirect}
+            onRenewLoan={(loan) => setSelectedLoanForRenew(loan)}
+            onViewBook={(bookId) => onNavigate(`${isAdmin ? 'admin' : 'librarian'}/collection/books/${bookId}`)}
+            canManage={true}
+          />
+        )}
       </div>
 
       {/* Renew Modal */}

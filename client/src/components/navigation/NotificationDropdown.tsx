@@ -13,6 +13,7 @@ import { Bell, CheckCircle2, CheckCheck, ArrowRight } from 'lucide-react';
 import { useNotifications } from '../../features/notifications/NotificationsContext';
 import { useAuth } from '../../auth/AuthContext';
 import { NotificationBadge } from '../../features/notifications/components/NotificationBadge';
+import { resolveNotificationRoute } from '../../features/notifications/notificationRouting';
 
 export interface NotificationDropdownProps {
   onNavigateToNotifications?: () => void;
@@ -55,11 +56,15 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
     };
   }, [isOpen]);
 
-  const handleNotificationClick = (id: string, actionRoute?: string) => {
-    markAsRead(id);
+  const handleNotificationClick = async (id: string, actionRoute?: string) => {
+    try {
+      await markAsRead(id);
+    } catch {
+      // Safe no-op on background failure
+    }
     setIsOpen(false);
     if (actionRoute && onNavigate) {
-      onNavigate(actionRoute);
+      onNavigate(resolveNotificationRoute(actionRoute, effectiveRole));
     } else if (onNavigateToNotifications) {
       onNavigateToNotifications();
     }

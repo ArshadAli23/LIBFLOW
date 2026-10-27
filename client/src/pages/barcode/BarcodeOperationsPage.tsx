@@ -20,6 +20,8 @@ import {
   Trash2,
 } from 'lucide-react';
 
+import { barcodesApi } from '../../lib/api';
+
 export interface BarcodeOperationsPageProps {
   onNavigate: (path: string) => void;
 }
@@ -28,7 +30,7 @@ export const BarcodeOperationsPage: React.FC<BarcodeOperationsPageProps> = ({ on
   const { books, copies } = useBooks();
   const { members } = useMembers();
   const { loans } = useCirculation();
-  const { role } = useAuth();
+  const { role, authMode } = useAuth();
   const { addToast } = useToast();
 
   // Active scan result
@@ -41,11 +43,92 @@ export const BarcodeOperationsPage: React.FC<BarcodeOperationsPageProps> = ({ on
   const [printCopy, setPrintCopy] = useState<BookCopy | null>(null);
   const [printBook, setPrintBook] = useState<Book | null>(null);
 
-  const handleScan = (rawBarcode: string) => {
+  const handleScan = async (rawBarcode: string) => {
     setIsProcessing(true);
-    const result = resolveBarcodeInput(rawBarcode, { books, copies, members, loans });
+    let result = resolveBarcodeInput(rawBarcode, { books, copies, members, loans });
+
+    // In live mode, query database if barcode is not in local memory
+    if (!result.found && authMode === 'live') {
+      try {
+        const serverRes = await barcodesApi.lookup(rawBarcode);
+        if (serverRes.success && serverRes.data) {
+          const s = serverRes.data as any;
+          const now = new Date().toISOString();
+          if (s.scanType === 'BOOK_COPY' && s.copy) {
+            result = {
+              rawCode: s.barcode || rawBarcode,
+              entityType: 'BOOK_COPY',
+              found: true,
+              bookCopy: {
+                id: s.copy.id,
+                tenantId: 'default-library',
+                bookId: s.copy.bookId,
+                copyNumber: s.copy.copyNumber,
+                copyCode: s.copy.copyCode || undefined,
+                barcode: s.copy.barcode,
+                shelf: s.copy.shelf,
+                location: s.copy.location,
+                condition: s.copy.conditionRating || 'GOOD',
+                status: s.copy.status || 'AVAILABLE',
+                acquisitionDate: s.copy.acquisitionDate || now,
+                notes: s.copy.notes || undefined,
+                createdAt: now,
+                updatedAt: now,
+              } as any,
+              book: s.book ? {
+                id: s.book.id,
+                tenantId: 'default-library',
+                isbn: s.book.isbn,
+                title: s.book.title,
+                authors: s.book.authors || [],
+                publisher: s.book.publisher || '',
+                publicationYear: s.book.publicationYear || 2026,
+                category: s.book.category || 'General',
+                coverUrl: s.book.coverUrl || undefined,
+                status: s.book.status || 'AVAILABLE',
+              } as any : undefined,
+              activeLoan: s.activeLoan ? {
+                id: s.activeLoan.loanId,
+                loanNumber: s.activeLoan.loanNumber,
+                memberId: s.activeLoan.memberId || '',
+                status: s.activeLoan.isOverdue ? 'OVERDUE' : 'ACTIVE',
+                dueDate: s.activeLoan.dueDate,
+                checkoutDate: s.activeLoan.checkoutDate,
+              } as any : undefined,
+              message: `Identified Physical Copy #${s.copy.copyNumber} (${s.copy.barcode}) via Library Database`,
+              timestamp: now,
+            };
+          } else if (s.scanType === 'MEMBER' && s.member) {
+            result = {
+              rawCode: s.barcode || rawBarcode,
+              entityType: 'MEMBER',
+              found: true,
+              member: {
+                id: s.member.id,
+                tenantId: 'default-library',
+                memberId: s.member.memberId,
+                fullName: s.member.fullName,
+                email: s.member.email,
+                phone: s.member.phone || undefined,
+                department: s.member.department || undefined,
+                memberType: s.member.memberType || 'STUDENT',
+                status: s.member.status || 'ACTIVE',
+                activeLoansCount: s.member.activeLoansCount || 0,
+                maxBorrowLimit: s.member.maxBorrowLimit || 5,
+                outstandingFine: s.member.outstandingBalance || 0,
+              } as any,
+              message: `Identified Patron: ${s.member.fullName} (${s.member.memberId}) via Library Database`,
+              timestamp: now,
+            };
+          }
+        }
+      } catch {
+        // Safe fallback to not found
+      }
+    }
+
     setActiveResult(result);
-    setScanHistory((prev) => [result, ...prev.slice(0, 19)]); // Keep last 20 scans
+    setScanHistory((prev) => [result, ...prev.slice(0, 19)]);
     setIsProcessing(false);
 
     if (result.found) {
@@ -138,7 +221,7 @@ export const BarcodeOperationsPage: React.FC<BarcodeOperationsPageProps> = ({ on
             className="px-3 py-1.5 rounded-lg border border-border-subtle bg-surface text-canvas-text hover:bg-canvas-subtle transition-colors text-xs font-medium flex items-center gap-1.5"
           >
             <Repeat className="w-3.5 h-3.5 text-brand" />
-            <span>Check Out Terminal</span>
+            <span>Issue Desk (Checkout)</span>
           </button>
 
           <button

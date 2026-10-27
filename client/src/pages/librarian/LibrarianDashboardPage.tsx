@@ -44,10 +44,10 @@ export const LibrarianDashboardPage: React.FC<LibrarianDashboardPageProps> = ({ 
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl sm:text-3xl font-serif font-bold text-canvas-text tracking-tight">
-              Circulation Desk Command
+              Circulation Desk Operations
             </h1>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-brand/10 text-brand uppercase">
-              Circulation Operations
+              Staff Desk
             </span>
           </div>
           <p className="text-xs sm:text-sm text-canvas-muted mt-1">
@@ -57,7 +57,7 @@ export const LibrarianDashboardPage: React.FC<LibrarianDashboardPageProps> = ({ 
 
         <div className="flex items-center gap-2 text-xs font-mono text-canvas-muted">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Desk Terminal Online: Station 02</span>
+          <span>Circulation Desk Online: Station 02</span>
         </div>
       </div>
 
@@ -354,7 +354,7 @@ export const LibrarianDashboardPage: React.FC<LibrarianDashboardPageProps> = ({ 
           <div className="p-4 rounded-xl border border-border-subtle bg-surface space-y-2">
             <div className="flex items-center gap-2 text-xs font-semibold text-canvas-text">
               <Barcode className="w-4 h-4 text-brand" />
-              <span>Barcode Terminal Input</span>
+              <span>Barcode Scanner Input</span>
             </div>
             <p className="text-[11px] text-canvas-muted">
               Scan accession label or smartcard badge to quick-jump to circulation record.

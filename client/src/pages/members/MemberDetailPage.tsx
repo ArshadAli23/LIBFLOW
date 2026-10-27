@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMembers } from '../../features/members/MembersContext';
 import { MemberStatusBadge, MemberTypeBadge } from '../../features/members/components/MemberStatusBadge';
 import { ChangeStatusModal } from '../../features/members/components/ChangeStatusModal';
@@ -22,22 +22,48 @@ import {
   Sparkles,
 } from 'lucide-react';
 
+import { Spinner } from '../../components/feedback/FeedbackStates';
+
 export interface MemberDetailPageProps {
   memberId: string;
   onNavigate: (path: string) => void;
 }
 
 export const MemberDetailPage: React.FC<MemberDetailPageProps> = ({ memberId, onNavigate }) => {
-  const { getMemberById, activities, updateMemberStatus } = useMembers();
-  const { role } = useAuth();
+  const { getMemberById, fetchMemberById, activities, updateMemberStatus } = useMembers();
+  const { role, authMode } = useAuth();
   const isAdmin = role === 'ADMIN';
 
-  const member = getMemberById(memberId);
-  const memberActivities = member ? activities[member.id] || [] : [];
+  const [member, setMember] = useState<any>(() => getMemberById(memberId));
+  const [isFetching, setIsFetching] = useState<boolean>(!member && authMode === 'live');
 
+  useEffect(() => {
+    const cached = getMemberById(memberId);
+    if (cached) {
+      setMember(cached);
+    } else if (authMode === 'live') {
+      setIsFetching(true);
+      fetchMemberById(memberId)
+        .then((m) => {
+          if (m) setMember(m);
+        })
+        .finally(() => setIsFetching(false));
+    }
+  }, [memberId, authMode, getMemberById, fetchMemberById]);
+
+  const memberActivities = member ? activities[member.id] || [] : [];
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
   const basePath = isAdmin ? 'admin/members' : 'librarian/members';
+
+  if (isFetching) {
+    return (
+      <div className="py-24 flex flex-col items-center justify-center space-y-3 bg-surface/50 rounded-2xl border border-border-subtle">
+        <Spinner size="lg" />
+        <p className="text-xs text-canvas-muted font-mono">Loading patron dossier...</p>
+      </div>
+    );
+  }
 
   if (!member) {
     return (
@@ -399,8 +425,9 @@ export const MemberDetailPage: React.FC<MemberDetailPageProps> = ({ memberId, on
         member={member}
         isOpen={isStatusModalOpen}
         onClose={() => setIsStatusModalOpen(false)}
-        onConfirm={(id, status, reason) => {
-          updateMemberStatus(id, status, reason);
+        onConfirm={async (id, status, reason) => {
+          const updated = await updateMemberStatus(id, status, reason);
+          if (updated) setMember(updated);
           setIsStatusModalOpen(false);
         }}
       />

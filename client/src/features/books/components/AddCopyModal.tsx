@@ -10,6 +10,7 @@ import { Barcode, Plus } from 'lucide-react';
 import { Modal } from '../../../components/ui/Modal';
 import { FormField, Input, Textarea, Select } from '../../../components/forms/FormControls';
 import { Button } from '../../../components/ui/Button';
+import { Alert } from '../../../components/feedback/FeedbackStates';
 import type { Book, BookCopy, CopyCondition, CopyStatus } from '../types';
 
 export interface AddCopyModalProps {
@@ -17,7 +18,7 @@ export interface AddCopyModalProps {
   onClose: () => void;
   book: Book;
   existingCopiesCount: number;
-  onAddCopy: (copyData: Omit<BookCopy, 'id' | 'tenantId' | 'createdAt' | 'updatedAt' | 'timeline'>) => void;
+  onAddCopy: (copyData: Omit<BookCopy, 'id' | 'tenantId' | 'createdAt' | 'updatedAt' | 'timeline'>) => Promise<unknown> | void;
 }
 
 export const AddCopyModal: React.FC<AddCopyModalProps> = ({
@@ -40,28 +41,39 @@ export const AddCopyModal: React.FC<AddCopyModalProps> = ({
   const [acquisitionCost, setAcquisitionCost] = useState<string>('49.99');
   const [notes, setNotes] = useState<string>('');
   const [errors, setErrors] = useState<{ barcode?: string }>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError(null);
     if (!barcode.trim()) {
       setErrors({ barcode: 'Accession barcode is required.' });
       return;
     }
 
-    onAddCopy({
-      bookId: book.id,
-      copyNumber: Number(copyNumber) || nextCopyNum,
-      barcode: barcode.trim().toUpperCase(),
-      status,
-      condition,
-      location: location.trim() || 'Main Library',
-      shelf: shelf.trim() || 'A-01-01',
-      acquisitionDate,
-      acquisitionCost: parseFloat(acquisitionCost) || 0,
-      notes: notes.trim() || undefined,
-    });
+    setIsSubmitting(true);
+    try {
+      await onAddCopy({
+        bookId: book.id,
+        copyNumber: Number(copyNumber) || nextCopyNum,
+        barcode: barcode.trim().toUpperCase(),
+        status,
+        condition,
+        location: location.trim() || 'Main Library',
+        shelf: shelf.trim() || 'A-01-01',
+        acquisitionDate,
+        acquisitionCost: parseFloat(acquisitionCost) || 0,
+        notes: notes.trim() || undefined,
+      });
 
-    onClose();
+      setIsSubmitting(false);
+      onClose();
+    } catch (err: unknown) {
+      setIsSubmitting(false);
+      const msg = err instanceof Error ? err.message : 'Failed to accession physical copy.';
+      setSubmitError(msg);
+    }
   };
 
   return (
@@ -73,12 +85,13 @@ export const AddCopyModal: React.FC<AddCopyModalProps> = ({
       size="lg"
       footer={
         <>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button
             variant="primary"
             size="sm"
+            isLoading={isSubmitting}
             leftIcon={<Plus className="w-4 h-4" />}
             onClick={handleSubmit}
           >
@@ -88,6 +101,15 @@ export const AddCopyModal: React.FC<AddCopyModalProps> = ({
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        {submitError && (
+          <Alert
+            variant="error"
+            title="Accession Failed"
+            description={submitError}
+            onClose={() => setSubmitError(null)}
+          />
+        )}
+
         {/* Prominent Visual Barcode Card Preview */}
         <div className="p-4 rounded-xl bg-canvas-subtle border border-border-subtle flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">

@@ -1,15 +1,19 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useReservations } from '../../features/reservations/ReservationsContext';
 import type { Reservation, ReservationFilterState } from '../../features/reservations/types';
 import { ReservationTable } from '../../features/reservations/components/ReservationTable';
 import { SearchInput } from '../../components/forms/FormControls';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../auth/AuthContext';
+import { Button } from '../../components/ui/Button';
+import { Alert, Spinner } from '../../components/feedback/FeedbackStates';
 import {
   Clock,
   Archive,
   Bookmark,
   MapPin,
+  Hourglass,
+  RefreshCw,
 } from 'lucide-react';
 
 export interface ReservationsListPageProps {
@@ -21,12 +25,17 @@ export const ReservationsListPage: React.FC<ReservationsListPageProps> = ({
 }) => {
   const {
     reservations,
+    isLoading,
+    error,
+    clearError,
+    fetchReservations,
     markReadyForPickup,
     markClaimed,
     cancelReservation,
+    processExpired,
   } = useReservations();
   const { addToast } = useToast();
-  const { role } = useAuth();
+  const { role, authMode } = useAuth();
   const isAdmin = role === 'ADMIN';
 
   const basePath = isAdmin ? 'admin/reservations' : 'librarian/reservations';
@@ -35,6 +44,21 @@ export const ReservationsListPage: React.FC<ReservationsListPageProps> = ({
     search: '',
     status: 'ALL',
   });
+
+  const [isProcessingExpired, setIsProcessingExpired] = useState(false);
+
+  // Synchronize search and status filter with backend in live mode
+  useEffect(() => {
+    if (authMode === 'live') {
+      const timer = setTimeout(() => {
+        fetchReservations({
+          search: filterState.search.trim() || undefined,
+          status: filterState.status === 'ALL' ? undefined : filterState.status,
+        }).catch(() => {});
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+  }, [authMode, filterState.search, filterState.status, fetchReservations]);
 
   // KPI Metrics
   const metrics = useMemo(() => {
@@ -47,7 +71,7 @@ export const ReservationsListPage: React.FC<ReservationsListPageProps> = ({
     return { total, waiting, ready, claimed, cancelled };
   }, [reservations]);
 
-  // Filtered reservations
+  // Filtered reservations (in demo mode: client-side filter; in live mode: server returns filtered or fallback)
   const filteredReservations = useMemo(() => {
     return reservations.filter((r) => {
       if (filterState.search.trim()) {
@@ -66,36 +90,82 @@ export const ReservationsListPage: React.FC<ReservationsListPageProps> = ({
     });
   }, [reservations, filterState]);
 
-  const handleMarkReady = (res: Reservation) => {
-    const updated = markReadyForPickup(res.id, 'Hold Staging Slot H-04');
-    if (updated) {
+  const handleMarkReady = async (res: Reservation) => {
+    try {
+      const updated = await markReadyForPickup(res.id, 'Hold Staging Slot H-04');
+      if (updated) {
+        addToast({
+          title: 'Volume Staged for Pickup',
+          message: `Hold ${updated.reservationNumber} for "${updated.bookTitle}" is ready at ${updated.pickupSlot || 'Counter'}.`,
+          type: 'success',
+        });
+      }
+    } catch (err: any) {
       addToast({
-        title: 'Volume Staged for Pickup',
-        message: `Hold ${updated.reservationNumber} for "${updated.bookTitle}" is ready at ${updated.pickupSlot}.`,
-        type: 'success',
+        title: 'Staging Update Failed',
+        message: err?.message || 'Could not stage volume.',
+        type: 'error',
       });
     }
   };
 
-  const handleMarkClaimed = (res: Reservation) => {
-    const updated = markClaimed(res.id);
-    if (updated) {
+  const handleMarkClaimed = async (res: Reservation) => {
+    try {
+      const updated = await markClaimed(res.id);
+      if (updated) {
+        addToast({
+          title: 'Reservation Claimed',
+          message: `Hold ${updated.reservationNumber} marked as claimed by ${updated.memberName}. Active loan created.`,
+          type: 'success',
+        });
+      }
+    } catch (err: any) {
       addToast({
-        title: 'Reservation Claimed',
-        message: `Hold ${updated.reservationNumber} marked as claimed by ${updated.memberName}.`,
-        type: 'success',
+        title: 'Claim Failed',
+        message: err?.message || 'Could not claim reservation.',
+        type: 'error',
       });
     }
   };
 
-  const handleCancel = (res: Reservation) => {
-    const updated = cancelReservation(res.id, 'Cancelled by desk operator');
-    if (updated) {
+  const handleCancel = async (res: Reservation) => {
+    try {
+      const updated = await cancelReservation(res.id, 'Cancelled by desk operator');
+      if (updated) {
+        addToast({
+          title: 'Reservation Cancelled',
+          message: `Hold ${updated.reservationNumber} was cancelled and queue positions were recalculated.`,
+          type: 'info',
+        });
+      }
+    } catch (err: any) {
       addToast({
-        title: 'Reservation Cancelled',
-        message: `Hold ${updated.reservationNumber} was cancelled and queue positions were recalculated.`,
+        title: 'Cancellation Failed',
+        message: err?.message || 'Could not cancel reservation.',
+        type: 'error',
+      });
+    }
+  };
+
+  const handleProcessExpired = async () => {
+    setIsProcessingExpired(true);
+    try {
+      const result = await processExpired();
+      addToast({
+        title: 'Expired Holds Processed',
+        message: result?.processedCount
+          ? `Successfully processed ${result.processedCount} expired reservation holds.`
+          : 'No expired pickup holds were pending sweep.',
         type: 'info',
       });
+    } catch (err: any) {
+      addToast({
+        title: 'Process Expired Holds Failed',
+        message: err?.message || 'Could not process expired holds.',
+        type: 'error',
+      });
+    } finally {
+      setIsProcessingExpired(false);
     }
   };
 
@@ -120,7 +190,19 @@ export const ReservationsListPage: React.FC<ReservationsListPageProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start md:self-auto">
+        <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
+          {/* Staff Batch Expired Hold Processor (Section 2 & 5 Requirement) */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleProcessExpired}
+            isLoading={isProcessingExpired}
+            leftIcon={<Hourglass className="w-3.5 h-3.5 text-amber-500" />}
+            className="text-xs"
+          >
+            Sweep Expired Holds
+          </Button>
+
           <span className="inline-flex items-center gap-1.5 text-xs font-mono text-emerald-700 dark:text-emerald-400 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
             <MapPin className="w-3.5 h-3.5" />
             Counter Staging Active
@@ -128,7 +210,28 @@ export const ReservationsListPage: React.FC<ReservationsListPageProps> = ({
         </div>
       </div>
 
-      {/* Asymmetric Editorial Hero Composition (Replaces 4 identical template boxes) */}
+      {/* Error Alert with Retry Action */}
+      {error && (
+        <Alert
+          variant="error"
+          title="Reservation Engine Notice"
+          description={error}
+          onClose={clearError}
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => fetchReservations()}
+              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+              className="text-xs mt-2"
+            >
+              Retry Connection
+            </Button>
+          }
+        />
+      )}
+
+      {/* Asymmetric Editorial Hero Composition */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Left: 7-col Primary Hold Velocity Telemetry Card */}
         <div className="lg:col-span-7 p-6 rounded-2xl border border-border-subtle bg-surface shadow-card flex flex-col justify-between relative overflow-hidden">
@@ -285,6 +388,14 @@ export const ReservationsListPage: React.FC<ReservationsListPageProps> = ({
           )}
         </div>
       </div>
+
+      {/* Live Loading Indicator */}
+      {isLoading && (
+        <div className="py-2 flex items-center justify-center gap-2 text-xs font-mono text-canvas-muted">
+          <Spinner size="sm" />
+          <span>Synchronizing hold queue telemetry...</span>
+        </div>
+      )}
 
       {/* Main Reservations Table */}
       <ReservationTable

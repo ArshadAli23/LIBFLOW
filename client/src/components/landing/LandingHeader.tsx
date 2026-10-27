@@ -94,15 +94,6 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
             {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
           </button>
 
-          {/* Quick Nav to Reviewer Design System */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onNavigate('design-system')}
-            className="hidden lg:inline-flex text-xs text-canvas-muted hover:text-canvas-text"
-          >
-            Design Tokens
-          </Button>
 
           {/* Login Action */}
           <Button

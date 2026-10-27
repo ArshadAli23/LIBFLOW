@@ -37,11 +37,11 @@ export interface MemberDashboardPageProps {
 }
 
 export const MemberDashboardPage: React.FC<MemberDashboardPageProps> = ({ onNavigate }) => {
-  const { user } = useAuth();
+  const { user, authMode } = useAuth();
   const { member, memberId, domainId, isLinked } = useActiveMember();
   const { getLoansForMember } = useCirculation();
   const { getReservationsForMember } = useReservations();
-  const { getFinesForMember, policy } = useFines();
+  const { fines, getFinesForMember, policy } = useFines();
 
   // 1. Loans strictly isolated to this active patron
   const myLoans = useMemo(() => {
@@ -81,9 +81,12 @@ export const MemberDashboardPage: React.FC<MemberDashboardPageProps> = ({ onNavi
 
   // 3. Fines strictly isolated to this active patron
   const myFines = useMemo(() => {
+    if (authMode === 'live') {
+      return fines;
+    }
     if (!domainId && !memberId) return [];
     return getFinesForMember(domainId || memberId || '');
-  }, [domainId, memberId, getFinesForMember]);
+  }, [authMode, fines, domainId, memberId, getFinesForMember]);
 
   const totalOutstanding = useMemo(() => {
     return myFines

@@ -3,6 +3,9 @@ import { ArrowLeft, Mail, Send, CheckCircle2 } from 'lucide-react';
 import { FormField, Input } from '../forms/FormControls';
 import { Button } from '../ui/Button';
 import { Alert } from '../feedback/FeedbackStates';
+import { useAuth } from '../../auth/AuthContext';
+import { authApi } from '../../lib/api/auth';
+import { ApiClientError } from '../../lib/api/types';
 
 export interface ForgotPasswordFormProps {
   onBackToLogin: () => void;
@@ -13,12 +16,13 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
   onBackToLogin,
   onSimulateResetLink,
 }) => {
+  const { authMode } = useAuth();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -34,11 +38,28 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
 
     setIsLoading(true);
 
-    // Simulate sending reset link
-    setTimeout(() => {
-      setIsLoading(false);
-      setIsSuccess(true);
-    }, 800);
+    if (authMode === 'live') {
+      try {
+        await authApi.forgotPassword({ email: email.trim() });
+        setIsLoading(false);
+        setIsSuccess(true);
+      } catch (err: unknown) {
+        setIsLoading(false);
+        let msg = 'Failed to process password recovery request.';
+        if (err instanceof ApiClientError) {
+          msg = err.message;
+        } else if (err instanceof Error) {
+          msg = err.message;
+        }
+        setError(msg);
+      }
+    } else {
+      // Simulate sending reset link in demo mode
+      setTimeout(() => {
+        setIsLoading(false);
+        setIsSuccess(true);
+      }, 800);
+    }
   };
 
   return (

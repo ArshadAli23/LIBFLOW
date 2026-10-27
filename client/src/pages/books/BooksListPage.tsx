@@ -2,18 +2,19 @@
  * LIBFLOW — Books Management & Discovery Page
  * 
  * Central collection catalog supporting table, compact, and grid views,
- * search across bibliographic identifiers, and role-aware actions.
+ * search across bibliographic identifiers, server/client pagination,
+ * and role-aware actions.
  */
 
-import React, { useState, useMemo } from 'react';
-import { Plus, Download, Upload } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Plus, Download, Upload, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useBooks } from '../../features/books/BooksContext';
 import { BookFilters } from '../../features/books/components/BookFilters';
 import { BookTable } from '../../features/books/components/BookTable';
 import { BookCard } from '../../features/books/components/BookCard';
 import { Button } from '../../components/ui/Button';
-import { EmptyState } from '../../components/feedback/FeedbackStates';
+import { EmptyState, Alert, Spinner } from '../../components/feedback/FeedbackStates';
 import type { BookFilterState, BookSortOption, BookViewMode } from '../../features/books/types';
 
 export interface BooksListPageProps {
@@ -21,8 +22,16 @@ export interface BooksListPageProps {
 }
 
 export const BooksListPage: React.FC<BooksListPageProps> = ({ onNavigate }) => {
-  const { role } = useAuth();
-  const { books, copies, archiveBook } = useBooks();
+  const { role, authMode } = useAuth();
+  const {
+    books,
+    copies,
+    archiveBook,
+    isLoading,
+    error,
+    pagination,
+    fetchBooks,
+  } = useBooks();
 
   const isMember = role === 'MEMBER';
   const isAdmin = role === 'ADMIN';
@@ -41,18 +50,69 @@ export const BooksListPage: React.FC<BooksListPageProps> = ({ onNavigate }) => {
 
   const [sortOption, setSortOption] = useState<BookSortOption>('recently_added');
   const [viewMode, setViewMode] = useState<BookViewMode>('table');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  // Debounced search query for Live Mode
+  const [debouncedSearch, setDebouncedSearch] = useState(filters.searchQuery);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(filters.searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filters.searchQuery]);
+
+  // LIVE MODE: Fetch books whenever filters, sorting, or pagination changes
+  const isFirstMountRef = useRef(true);
+  useEffect(() => {
+    if (authMode === 'live') {
+      // Avoid firing redundant request on mount if BooksContext already fetched
+      if (isFirstMountRef.current) {
+        isFirstMountRef.current = false;
+      }
+      fetchBooks({
+        page: currentPage,
+        limit: 20,
+        search: debouncedSearch.trim() || undefined,
+        category: filters.category || undefined,
+        author: filters.author || undefined,
+        publisher: filters.publisher || undefined,
+        publicationYear: filters.publicationYear || undefined,
+        language: filters.language || undefined,
+        format: filters.format || undefined,
+        availability: filters.availability !== 'ALL' ? filters.availability : undefined,
+        sortBy: sortOption,
+      });
+    }
+  }, [
+    authMode,
+    currentPage,
+    debouncedSearch,
+    filters.category,
+    filters.author,
+    filters.publisher,
+    filters.publicationYear,
+    filters.language,
+    filters.format,
+    filters.availability,
+    sortOption,
+    fetchBooks,
+  ]);
 
   // Unique categories and publishers for filter options
   const availableCategories = useMemo(() => {
-    return Array.from(new Set(books.map((b) => b.category))).sort();
+    return Array.from(new Set(books.map((b) => b.category))).filter(Boolean).sort();
   }, [books]);
 
   const availablePublishers = useMemo(() => {
-    return Array.from(new Set(books.map((b) => b.publisher))).sort();
+    return Array.from(new Set(books.map((b) => b.publisher))).filter(Boolean).sort();
   }, [books]);
 
-  // Filter & Search Logic
+  // DEMO MODE ONLY: In-memory filter and search logic
   const filteredBooks = useMemo(() => {
+    if (authMode === 'live') {
+      return books;
+    }
+
     const q = filters.searchQuery.trim().toLowerCase();
 
     // Map barcodes to bookIds for barcode-based searching
@@ -119,10 +179,14 @@ export const BooksListPage: React.FC<BooksListPageProps> = ({ onNavigate }) => {
 
       return true;
     });
-  }, [books, copies, filters]);
+  }, [authMode, books, copies, filters]);
 
-  // Sorting Logic
+  // DEMO MODE ONLY: In-memory sorting logic
   const sortedBooks = useMemo(() => {
+    if (authMode === 'live') {
+      return books;
+    }
+
     const list = [...filteredBooks];
 
     switch (sortOption) {
@@ -144,13 +208,15 @@ export const BooksListPage: React.FC<BooksListPageProps> = ({ onNavigate }) => {
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
     }
-  }, [filteredBooks, sortOption]);
+  }, [authMode, books, filteredBooks, sortOption]);
 
   const handleFilterChange = (updates: Partial<BookFilterState>) => {
+    setCurrentPage(1);
     setFilters((prev) => ({ ...prev, ...updates }));
   };
 
   const handleResetFilters = () => {
+    setCurrentPage(1);
     setFilters({
       searchQuery: '',
       availability: 'ALL',
@@ -189,7 +255,6 @@ export const BooksListPage: React.FC<BooksListPageProps> = ({ onNavigate }) => {
   };
 
   const handleExport = () => {
-    // Generate CSV string
     const headers = ['Title', 'Author', 'ISBN', 'Publisher', 'Year', 'Category', 'Total Copies', 'Available Copies'];
     const rows = sortedBooks.map((b) => [
       `"${b.title}"`,
@@ -211,6 +276,10 @@ export const BooksListPage: React.FC<BooksListPageProps> = ({ onNavigate }) => {
     document.body.removeChild(link);
   };
 
+  const displayedTotal = authMode === 'live' ? pagination.total : sortedBooks.length;
+  const overallCount = authMode === 'live' ? pagination.total : books.length;
+  const totalPages = authMode === 'live' ? pagination.totalPages : 1;
+
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Top Header */}
@@ -223,6 +292,11 @@ export const BooksListPage: React.FC<BooksListPageProps> = ({ onNavigate }) => {
             <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-brand/10 text-brand uppercase">
               {isMember ? 'Discovery' : 'Collection Master'}
             </span>
+            {authMode === 'live' && (
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-mono bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                Live API
+              </span>
+            )}
           </div>
           <p className="text-xs sm:text-sm text-canvas-muted mt-1">
             Manage the library's bibliographic collection and physical copies.
@@ -267,6 +341,40 @@ export const BooksListPage: React.FC<BooksListPageProps> = ({ onNavigate }) => {
         </div>
       </div>
 
+      {/* Global Error Banner */}
+      {error && (
+        <Alert
+          variant="error"
+          title="Catalog Retrieval Error"
+          description={error}
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+              onClick={() => {
+                fetchBooks({
+                  page: currentPage,
+                  limit: 20,
+                  search: debouncedSearch.trim() || undefined,
+                  category: filters.category || undefined,
+                  author: filters.author || undefined,
+                  publisher: filters.publisher || undefined,
+                  publicationYear: filters.publicationYear || undefined,
+                  language: filters.language || undefined,
+                  format: filters.format || undefined,
+                  availability: filters.availability !== 'ALL' ? filters.availability : undefined,
+                  sortBy: sortOption,
+                });
+              }}
+              className="text-xs mt-2"
+            >
+              Retry Connection
+            </Button>
+          }
+        />
+      )}
+
       {/* Filter & View Controls */}
       <BookFilters
         filters={filters}
@@ -276,14 +384,19 @@ export const BooksListPage: React.FC<BooksListPageProps> = ({ onNavigate }) => {
         onSortChange={setSortOption}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
-        totalResults={sortedBooks.length}
-        totalBooksCount={books.length}
+        totalResults={displayedTotal}
+        totalBooksCount={overallCount}
         availableCategories={availableCategories}
         availablePublishers={availablePublishers}
       />
 
       {/* Main Content Area */}
-      {sortedBooks.length === 0 ? (
+      {isLoading ? (
+        <div className="p-16 flex flex-col items-center justify-center space-y-3 bg-surface rounded-xl border border-border-subtle shadow-card">
+          <Spinner size="lg" />
+          <span className="text-xs font-mono text-canvas-muted">Loading library collection...</span>
+        </div>
+      ) : sortedBooks.length === 0 ? (
         <EmptyState
           title="No Books Found"
           description="No bibliographic records match your current search parameters. Try clearing your filters."
@@ -318,6 +431,36 @@ export const BooksListPage: React.FC<BooksListPageProps> = ({ onNavigate }) => {
           canManageCopies={!isMember}
           compact={viewMode === 'compact'}
         />
+      )}
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-border-subtle text-xs text-canvas-muted">
+          <div>
+            Showing page <span className="font-semibold text-canvas-text">{currentPage}</span> of{' '}
+            <span className="font-semibold text-canvas-text">{totalPages}</span> ({pagination.total} catalog titles)
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={currentPage <= 1 || isLoading}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              className="text-xs"
+            >
+              Previous
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={currentPage >= totalPages || isLoading}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              className="text-xs"
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );

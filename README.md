@@ -7,229 +7,415 @@
 [![Node.js Version](https://img.shields.io/badge/Node.js-v24.x-339933?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-v5.x-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![React Version](https://img.shields.io/badge/React-v19.x-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
-[![Vite](https://img.shields.io/badge/Bundler-Vite-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS_v4-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
+[![Vite](https://img.shields.io/badge/Bundler-Vite_8-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev)
 [![MySQL](https://img.shields.io/badge/Database-MySQL_8+-4479A1?style=flat-square&logo=mysql&logoColor=white)](https://www.mysql.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 
 <p align="center">
-  A modern, production-grade library circulation and inventory platform engineered for colleges, universities, research academies, and multi-tenant institutions. Built with clean modular TypeScript architecture, physical copy tracking, automated fine calculations, FIFO reservation queues, and an editorial SaaS interface.
+  A modern, production-grade library circulation and inventory platform engineered for colleges, universities, research academies, and multi-tenant institutions. Built with clean modular TypeScript architecture, serialized physical copy tracking, automated overdue fine calculation, FIFO reservation queues, and an editorial SaaS interface.
 </p>
 
-[Architecture Overview](#-architecture) • [Features](#-core-features) • [Quick Start](#-installation--running-locally) • [API Specification](#-rest-api-specification) • [Demo Credentials](#-demo-credentials)
+[System Overview](docs/PROJECT_OVERVIEW.md) • [Architecture](ARCHITECTURE.md) • [Installation & Setup](#-installation--local-setup) • [API Specification](#-rest-api-specification) • [Seed Accounts](#-seed-accounts--demo-access)
 
 </div>
 
 ---
 
 ## 📖 Table of Contents
-- [Problem Statement](#-problem-statement)
-- [The Solution](#-the-solution)
-- [Core Features](#-core-features)
-- [System Architecture](#-architecture)
-- [Tech Stack](#-technology-stack)
-- [Project Directory Structure](#-project-directory-structure)
-- [Database Schema Design](#-database-schema-design)
-- [Reservation State Machine](#-reservation-state-machine)
-- [REST API Specification](#-rest-api-specification)
-- [Installation & Running Locally](#-installation--running-locally)
-- [Environment Configuration](#-environment-configuration)
-- [Automated Testing](#-testing)
-- [Demo Credentials](#-demo-credentials)
-- [Production Deployment](#-deployment)
-- [Future Enhancements & Multi-Tenancy](#-future-enhancements--multi-tenancy)
-- [Contributing](#-contribution-guidelines)
-- [License](#-license)
+1. [Project Description](#-project-description)
+2. [Problem Statement & Objectives](#-problem-statement--objectives)
+3. [Main Features & Role-Based Permissions](#-main-features--role-based-permissions)
+4. [Technology Stack](#-technology-stack)
+5. [System Architecture](#-system-architecture)
+6. [Database Schema & Entity Relationships](#-database-schema--entity-relationships)
+7. [Prerequisites](#-prerequisites)
+8. [Installation & Local Setup](#-installation--local-setup)
+9. [Database Setup & Environment Configuration](#-database-setup--environment-configuration)
+10. [Database Migrations](#-database-migrations)
+11. [Running Client & Server](#-running-client--server)
+12. [Testing, Linting & Quality Verification](#-testing-linting--quality-verification)
+13. [Demo Mode vs. Live Backend Mode](#-demo-mode-vs-live-backend-mode)
+14. [REST API Specification](#-rest-api-specification)
+15. [Security Controls & Known Limitations](#-security-controls--known-limitations)
+16. [Troubleshooting Guide](#-troubleshooting-guide)
 
 ---
 
-## 🚨 Problem Statement
+## 💡 Project Description
 
-Most open-source or academic library systems suffer from critical deficiencies:
-1. **Conflating Titles with Physical Inventory:** Most systems treat a "Book" as a single row with an integer counter (e.g. `available_count: 5`). They cannot track which physical copy is damaged, which shelf tier it sits on, or which exact barcode (`LC-00124`) a student is holding.
-2. **Naive Circulation & Lack of Grace Policies:** Due dates and late fees are often hardcoded without grace periods, dynamic member quotas (faculty vs student), or administrative waiver audits.
-3. **Absence of Fair Reservation Queues:** When popular books run out of stock, students must repeatedly check back manually. There is no automated FIFO reservation hold engine.
-4. **Poor UI/UX:** Traditional library tools look like 1990s desktop tables or generic low-contrast CRUD admin templates with clumsy interactions.
+**LIBFLOW** is an enterprise-grade web application engineered to streamline university and institutional library operations. It bridges the gap between bibliographic catalog management and physical desk circulation by treating books as abstract titles and copies as serialized inventory items with distinct barcodes, shelf coordinates, and lifecycle conditions.
+
+The platform provides desk librarians with high-velocity issue/return workflows, patron self-service catalogs, dynamic waitlists with staged hold expirations, automated financial penalty calculation, and role-scoped notifications.
 
 ---
 
-## 💡 The Solution
+## 🚨 Problem Statement & Objectives
 
-**LIBFLOW** re-engineers library operations from the ground up:
-- **True Physical Asset Management:** Clean separation of bibliographic metadata (`Book`) and discrete serialized physical inventory (`BookCopy`).
-- **Dynamic Policy Engine:** Centralized rules for borrowing periods, quota limits, grace periods, daily penalty accruals, and maximum fine ceilings.
-- **Automated Hold Pipeline:** First-in, first-out (FIFO) reservation queues that automatically lock returned copies for the next member and dispatch notification alerts.
-- **Fast Desk Operations:** Rapid-fire barcode lookup and scan simulator for high-throughput front-desk checkouts and returns.
-- **Modern Editorial SaaS Experience:** Built using high-end UI design standards—subtle haptic depth, micro-interactions, responsive mobile views, and accessible layouts.
+### The Problem
+Legacy and open-source library systems frequently suffer from architectural shortcuts:
+- **Quantity-Based Tracking:** Decrementing a simple counter (e.g. `available: 5`) makes it impossible to know *which* physical volume is lost, damaged, or checked out by an individual student.
+- **Inflexible Circulation Rules:** Rigid borrow durations without configurable grace periods, patron-tier quotas (faculty vs student), or administrative waiver logs.
+- **Unfair Hold Allocation:** When popular books are returned, they are often snatched up randomly instead of honoring waitlist seniority.
+- **Fragile Security:** Storing sensitive access tokens in browser `localStorage`, lacking CSRF guards, and relying on client-side role assertions.
 
----
-
-## ✨ Core Features
-
-### 1. Bibliographic & Inventory Management
-- Rich bibliographic records (ISBN-10/13, multiple authors, publishers, categories, editions, summaries, cover artwork).
-- Serialized copy lifecycle: Barcode/QR ID, shelf location (e.g., `Stack B4, Tier 3`), condition grade, and status (`AVAILABLE`, `BORROWED`, `RESERVED`, `MAINTENANCE`, `LOST`, `DAMAGED`).
-
-### 2. High-Speed Circulation Engine
-- **Desk Checkout:** Instant member quota and restriction validation, copy state verification, and automated due date assignment.
-- **Desk Check-in:** One-click return flow with automated overdue day calculations and fine ledger generation.
-- **Self-Service Renewals:** Controlled renewal permissions with maximum renewal caps and hold-conflict detection.
-
-### 3. FIFO Reservation Queues
-- Join reservation queues on checked-out titles.
-- Automated allocation of newly returned copies to senior queue members with configurable hold expiration windows (e.g., 48 hours).
-- Deterministic state machine: `WAITING` → `READY_FOR_PICKUP` → `CLAIMED` / `EXPIRED`.
-
-### 4. Financial Fine Ledger & Waivers
-- Mathematical penalty calculation taking into account configurable grace periods.
-- Fine collection management (Cash, Card, Online) and audited administrative waivers with required reasoning.
-
-### 5. Multi-Role Workspaces
-- **Admin Workspace:** Institutional parameters, staff management, financial ledger, circulation analytics, audit log inspection.
-- **Librarian Workspace:** High-velocity desk scanner, circulation queues, inventory audits, member accounts.
-- **Member Portal:** Discovery catalog, live shelf availability, active loan timers, hold queue positions, fine history.
-
-### 6. Rule-Based Book Recommendations
-- Contextual reading discovery based on borrowing co-occurrence, category affinity, and popular faculty picks.
+### Objectives
+1. **Serialized Asset Separation:** Decouple abstract bibliographic works (`books`) from concrete physical copies (`book_copies`).
+2. **Automated State Machines:** Deterministic transitions for loans (`ACTIVE` $\rightarrow$ `RETURNED` / `OVERDUE`) and holds (`WAITING` $\rightarrow$ `READY_FOR_PICKUP` $\rightarrow$ `CLAIMED` / `EXPIRED`).
+3. **Audited Financial Ledger:** Transparent overdue fine calculations, partial/full payment tracking, and audited administrator waivers.
+4. **Hardened Security:** HttpOnly cookie sessions, double-submit anti-CSRF protection, strict input validation, and zero credentials in client storage.
+5. **Editorial User Experience:** Modern responsive interface compliant with WCAG AA accessibility, seamless theme toggling, and clean visual typography.
 
 ---
 
-## 🏛 Architecture
+## ✨ Main Features & Role-Based Permissions
 
-```mermaid
-flowchart LR
-    subgraph Client ["Client App (React 19 + TypeScript + Vite)"]
-        Landing["Editorial Landing & 3D Hero"]
-        AdminUI["Admin Control Panel"]
-        LibUI["Librarian Circulation Desk"]
-        MemUI["Member Discovery Portal"]
-    end
+LIBFLOW implements Role-Based Access Control (RBAC) across three distinct institutional roles:
 
-    subgraph Server ["Modular API Server (Node + Express + TypeScript)"]
-        Auth["JWT & RBAC Guards"]
-        CircService["Circulation Service"]
-        FineService["Fine & Penalty Engine"]
-        QueueService["FIFO Reservation Engine"]
-        CatalogService["Catalog & Copy Service"]
-        Jobs["node-cron Scheduled Jobs"]
-    end
-
-    subgraph Storage ["Database (MySQL 8+ Relational Engine)"]
-        Books[(Books & Copies)]
-        Loans[(Loans & Holds)]
-        Users[(Users & Members)]
-        Audit[(Audit Ledger)]
-    end
-
-    Client -->|HTTPS / REST API /api/v1| Server
-    Server -->|mysql2 Connection Pool| Storage
-```
-
-*For complete architectural specifications, see [ARCHITECTURE.md](file:///c:/Users/arsha/Desktop/LIBRARY/ARCHITECTURE.md).*
+| Module / Capability | Administrator (`ADMIN`) | Librarian (`LIBRARIAN`) | Patron (`MEMBER`) |
+| :--- | :---: | :---: | :---: |
+| **Catalog Search & Book Inspection** | Full | Full | Read-Only |
+| **Manage Books & Physical Copies** | Create / Edit / Withdraw | Create / Edit / Withdraw | No Access |
+| **Desk Check-Out & Check-In** | Permitted | Permitted | No Access |
+| **Loan Renewals** | Permitted (Any Patron) | Permitted (Any Patron) | Self-Service (Own Loans) |
+| **Place & Cancel Hold Reservations** | Any Patron | Any Patron | Self-Service (Own Holds) |
+| **Claim Ready Hold Pickups** | Desk Processing | Desk Processing | Pick Up at Desk |
+| **Fine Collection & Payment Receipts** | Cash / Card / Online | Cash / Card / Online | Pay Outstanding Dues |
+| **Fine Waivers (Audited Exemption)** | **Exclusive Authority** | Denied | Denied |
+| **Patron Registration & Status Control** | Full Control | Full Control | Edit Contact Only |
+| **Analytics & Circulation Reporting** | Complete Dashboard | Circulation Overview | Personal Stats Only |
+| **Staff Broadcast Notifications** | Full Authority | Full Authority | Receive Alerts |
+| **Digital Member Card & Barcode Pass** | View Any Card | View Any Card | Self-Service Digital Pass |
 
 ---
 
 ## 🛠 Technology Stack
 
-- **Frontend:** React 19, TypeScript, Vite, Tailwind CSS + Centralized Design Tokens, Phosphor Icons / Clean SVGs, Framer Motion, Three.js / React Three Fiber (Isolated Hero Canvas).
-- **Backend:** Node.js v24 (LTS), Express.js, TypeScript, JWT, bcrypt / Argon2, node-cron.
-- **Database:** MySQL 8+, mysql2 with connection pooling, strict foreign keys, compound indexes, and version-controlled SQL migrations.
-- **Security:** Helmet, CORS Origin Validation, Express Rate Limit, Parameterized SQL Queries via mysql2.
-- **Testing:** Vitest, Supertest, React Testing Library, Postman Collections.
+### Frontend Client
+- **Framework:** React 19.2 (Concurrent Features, Hooks)
+- **Language:** TypeScript 5.8+ (Strict Type Checking)
+- **Build Tool:** Vite 8.3 (High-performance ESM Bundler)
+- **Styling:** Vanilla CSS + Tailwind CSS 4 + CSS Design Tokens (`src/styles/tokens.css`)
+- **Icons:** Lucide React (Clean SVG icons)
+- **3D Graphics:** Three.js (Isolated Hero Canvas with reduced-motion fallback)
+- **Testing:** Node.js Native Test Runner (`node --experimental-strip-types --test`)
+- **Linter:** Oxlint (High-speed Rust-based linter)
+
+### Backend Service
+- **Runtime:** Node.js v24.x LTS (ES Modules `"type": "module"`)
+- **Framework:** Express.js 4.21
+- **Language:** TypeScript 5.8+ (Strict ESM transpilation via `tsx watch` & `tsc`)
+- **Database Driver:** `mysql2/promise` (Connection pool, parameterized queries)
+- **Security:** Helmet, CORS, Cookie-Parser, bcrypt (12 rounds)
+- **Testing:** Node.js Native Test Runner (`tsx --test`)
+
+### Database
+- **Engine:** MySQL 8.0+ Community Server / Enterprise
+- **Storage Engine:** InnoDB (Strict Foreign Keys, ACID Transactions, UTF-8mb4)
+- **Migrations:** Custom version-controlled SQL migration engine (`src/db/migrator.ts`)
 
 ---
 
-## 📂 Project Directory Structure
+## 🏛 System Architecture
 
-```
-LIBFLOW/
-├── client/                     # Frontend Application (React 19 + TypeScript + Vite)
-│   ├── public/                 # Static assets & favicon
-│   ├── src/
-│   │   ├── api/                # Axios API client & typed endpoints
-│   │   ├── assets/             # SVGs, 3D models, graphics
-│   │   ├── components/
-│   │   │   ├── ui/             # Button, Input, Modal, Badge, Card, StatCard...
-│   │   │   ├── navigation/     # Island Nav, Header, Sidebar, Breadcrumbs
-│   │   │   ├── forms/          # FormField, SelectField, Checkbox, Switch
-│   │   │   ├── data-display/   # DataTable, Pagination, Avatar, EmptyState
-│   │   │   └── feedback/       # Toast, Alert, Skeleton, LoadingState, ErrorState
-│   │   ├── features/           # Domain feature modules (circulation, catalog, holds)
-│   │   ├── hooks/              # Custom React hooks (useAuth, useDebounce, etc.)
-│   │   ├── layouts/            # Dashboard & Public page layouts
-│   │   ├── pages/              # Public, Admin, Librarian, Member route views
-│   │   ├── lib/                # Third-party utilities (Three setup, animation variants)
-│   │   ├── utils/              # Formatting & helper utilities
-│   │   ├── constants/          # Roles, reservation states, route paths
-│   │   ├── types/              # TypeScript interfaces & DTOs
-│   │   ├── styles/             # Tailwind base directives & centralized design tokens
-│   │   ├── App.tsx             # Route definitions & RBAC guards
-│   │   └── main.tsx            # Entry point
-│   ├── tailwind.config.ts
-│   ├── tsconfig.json
-│   └── vite.config.ts
-│
-├── server/                     # Backend API (Node.js + Express + TypeScript)
-│   ├── config/                 # Database & JWT configurations
-│   ├── controllers/            # Route controllers
-│   ├── middleware/             # Auth, RBAC, error & rate-limit middleware
-│   ├── models/                 # Mongoose schemas (Book, Copy, Loan, Fine, Audit...)
-│   ├── routes/                 # RESTful API route declarations (/api/v1)
-│   ├── services/               # Circulation, Fine, & Queue business logic
-│   ├── repositories/           # Data access query layer
-│   ├── validators/             # Request payload validation schemas
-│   ├── utils/                  # Logger, error classes, date calculators
-│   ├── jobs/                   # node-cron scheduled background tasks (hold expiry)
-│   ├── constants/              # Error codes, system enums
-│   ├── types/                  # Backend TypeScript type definitions
-│   ├── tests/                  # Unit and integration test suites
-│   ├── index.ts                # Server entry point
-│   ├── tsconfig.json
-│   └── package.json
-│
-├── docs/                       # Comprehensive documentation & UML
-├── ARCHITECTURE.md             # In-depth architectural design
-├── PROJECT_PLAN.md             # Phased execution plan & Jira epics
-└── README.md                   # Repository overview (this file)
-```
-
----
-
-## 🗄 Database Schema Design
-
-| Collection | Key Fields | Purpose |
-| :--- | :--- | :--- |
-| **User** | `_id, tenantId, email, passwordHash, role, fullName, avatarUrl, isActive` | Authentication, credentials, and staff privileges |
-| **Member** | `_id, tenantId, userRef, memberCode, memberType, department, maxBorrowLimit` | Student/faculty membership rules & quotas |
-| **Book** | `_id, tenantId, isbn, title, authors, category, publisher, year, coverImageUrl` | Bibliographic title master catalog |
-| **BookCopy** | `_id, tenantId, bookRef, copyNumber, barcode, shelfLocation, condition, status` | Physical serialized inventory with live shelf status |
-| **BorrowTransaction** | `_id, tenantId, memberRef, bookCopyRef, issueDate, dueDate, returnDate, status` | Active and historical circulation loans |
-| **Reservation** | `_id, tenantId, bookRef, memberRef, queuePosition, status, claimWindowExpiresAt` | FIFO hold queue with strict claim windows |
-| **Fine** | `_id, tenantId, transactionRef, memberRef, amount, daysOverdue, status` | Financial penalties, payments, and waiver logs |
-| **LibrarySettings** | `_id, tenantId, libraryName, logo, borrowDays, gracePeriodDays, finePerDay` | Centralized institutional configuration & branding |
-| **AuditLog** | `_id, tenantId, actorId, action, entityType, entityId, oldValue, newValue, timestamp` | Immutable compliance and security ledger |
-
----
-
-## 🔄 Reservation State Machine
+LIBFLOW uses a decoupled, three-tier architecture:
 
 ```mermaid
-stateDiagram-v2
-    [*] --> WAITING: Member requests reservation
-    WAITING --> READY_FOR_PICKUP: Physical copy checked in
-    WAITING --> CANCELLED: Member cancels reservation
-    READY_FOR_PICKUP --> CLAIMED: Desk librarian issues reserved copy
-    READY_FOR_PICKUP --> EXPIRED: Claim window expires (e.g. 48h)
-    EXPIRED --> [*]
-    CLAIMED --> [*]
-    CANCELLED --> [*]
+flowchart LR
+    subgraph ClientLayer ["Client Presentation (React 19 + TypeScript + Vite)"]
+        UI["Tailwind CSS + Tokens"]
+        Contexts["Domain Contexts"]
+        ApiClient["Typed API Client"]
+    end
+
+    subgraph SecurityGateway ["Security & Middleware Gateway"]
+        HelmetMW["Helmet Headers"]
+        CorsMW["CORS Guard"]
+        CookieMW["HttpOnly Cookies"]
+        RateLimitMW["Brute-Force Limiters"]
+        AuthMW["Session & RBAC Guards"]
+        CsrfMW["Anti-CSRF Validator"]
+    end
+
+    subgraph BackendLayer ["Backend API Service (Node.js + Express + TS)"]
+        Routes["REST Routers (/api/v1)"]
+        Controllers["Input Controllers"]
+        DomainServices["Domain Services (Circulation, Fines, Holds)"]
+    end
+
+    subgraph DatabaseLayer ["Persistence Tier (MySQL 8+)"]
+        Pool["mysql2 Connection Pool"]
+        Tables[("16 Relational Tables")]
+    end
+
+    ClientLayer -->|Credentials Included| SecurityGateway
+    SecurityGateway --> BackendLayer
+    BackendLayer --> Pool
+    Pool --> Tables
 ```
+
+---
+
+## 🗄 Database Schema & Entity Relationships
+
+The relational database schema is structured into **16 tables** in `libflow_db`:
+
+```mermaid
+erDiagram
+    USERS ||--o{ SESSIONS : has
+    USERS ||--o| MEMBERS : links
+    USERS ||--o{ AUDIT_LOGS : generates
+    USERS ||--o{ NOTIFICATIONS : receives
+
+    BOOKS ||--|{ BOOK_COPIES : contains
+    BOOKS ||--o{ RESERVATIONS : targets
+
+    BOOK_COPIES ||--o{ BOOK_COPY_EVENTS : records
+    BOOK_COPIES ||--o{ LOANS : checks_out
+    BOOK_COPIES ||--o{ RESERVATIONS : stages
+
+    MEMBERS ||--o{ LOANS : borrows
+    MEMBERS ||--o{ RESERVATIONS : queues
+    MEMBERS ||--o{ FINES : owes
+
+    LOANS ||--o| FINES : generates
+    FINES ||--o{ FINE_PAYMENTS : receipts
+    FINES ||--o{ FINE_WAIVERS : audited_by
+```
+
+### Core Relational Entities
+1. `users` — Authentication credentials (bcrypt hash), institutional roles (`ADMIN`, `LIBRARIAN`, `MEMBER`).
+2. `members` — Patron profiles, academic programs, borrow limits, restriction flags.
+3. `books` — Master bibliographic title catalog (ISBN, title, authors, publisher, year, subject).
+4. `book_copies` — Serialized physical assets (barcode, shelf location, condition, live status).
+5. `loans` — Active and historical circulation loans (issue date, due date, return date, renewals).
+6. `reservations` — Deterministic FIFO waitlists with 48-hour pickup expiration timers.
+7. `fines` — Overdue penalty ledger (amount, balance, days overdue, status).
+8. `fine_payments` — Payment records (Cash, Card, Online).
+9. `fine_waivers` — Administrator waivers with mandatory justification reason.
+10. `notifications` — Role-scoped alert notifications and staff broadcasts.
+11. `audit_logs` — Immutable administrative event audit trail.
+12. `sessions` — Server-managed session tokens for HttpOnly cookie authentication.
+
+---
+
+## 💻 Prerequisites
+
+Ensure your development environment meets the following requirements before installation:
+- **Node.js**: `v24.x LTS` (or `v20.x+`)
+- **npm**: `v10.x+` or `v11.x+`
+- **MySQL Server**: `MySQL 8.0+` active and running locally on port `3306`
+
+---
+
+## 🚀 Installation & Local Setup
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com/your-username/libflow.git
+cd libflow
+```
+
+### 2. Install Server Dependencies
+```bash
+cd server
+npm install
+```
+
+### 3. Install Client Dependencies
+```bash
+cd ../client
+npm install
+```
+
+---
+
+## ⚙️ Database Setup & Environment Configuration
+
+### 1. Create MySQL Database & User
+Log in to your local MySQL console:
+```sql
+CREATE DATABASE IF NOT EXISTS libflow_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'libflow_user'@'localhost' IDENTIFIED BY 'your_secure_password';
+GRANT ALL PRIVILEGES ON libflow_db.* TO 'libflow_user'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+### 2. Configure Backend Environment (`server/.env`)
+Copy `server/.env.example` to `server/.env`:
+```bash
+# In server/ directory
+cp .env.example .env
+```
+Update your `.env` with your local MySQL credentials:
+```env
+NODE_ENV=development
+PORT=5000
+API_PREFIX=/api/v1
+CORS_ORIGIN=http://localhost:5173
+CLIENT_URL=http://localhost:5173
+REQUEST_LIMIT=1mb
+LOG_LEVEL=info
+
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=libflow_user
+DB_PASSWORD=your_secure_password
+DB_NAME=libflow_db
+DB_CONNECTION_LIMIT=10
+
+SESSION_COOKIE_NAME=libflow_session
+SESSION_TTL_HOURS=168
+PASSWORD_RESET_TOKEN_TTL_MINUTES=60
+AUTH_RATE_LIMIT_MAX=5
+AUTH_RATE_LIMIT_WINDOW_MINUTES=15
+```
+
+### 3. Configure Frontend Environment (`client/.env`)
+Copy `client/.env.example` to `client/.env`:
+```bash
+# In client/ directory
+cp .env.example .env
+```
+Ensure the API URL points to your local Express server:
+```env
+VITE_APP_ENV=development
+VITE_API_BASE_URL=http://localhost:5000/api/v1
+VITE_DEFAULT_TENANT_ID=tenant_central
+VITE_AUTH_MODE=live
+VITE_ENABLE_MOCK_AUTH=true
+VITE_ENABLE_ANALYTICS=true
+VITE_ENABLE_BARCODE_SCANNER=true
+```
+
+---
+
+## 🔄 Database Migrations
+
+LIBFLOW uses a version-controlled SQL migration runner to track applied database changes.
+
+```bash
+# From the server/ directory:
+# Check status of applied migrations
+npm run migrate:status
+
+# Apply pending schema migrations (001_initial_schema.sql, 002_auth_and_sessions.sql)
+npm run migrate
+```
+
+*Note: Migrations are safe and idempotent (`CREATE TABLE IF NOT EXISTS` and `INSERT IGNORE`). Running them will not reset or delete existing library data.*
+
+---
+
+## 🏃 Running Client & Server
+
+Launch both services in separate terminal windows:
+
+### Terminal 1: Backend Express API Server
+```bash
+cd server
+npm run dev
+```
+Output:
+```
+================================================================
+ LIBFLOW Smart Library Management Platform — API Server
+ Environment : development
+ Port        : 5000
+ Base API    : http://localhost:5000/api/v1
+ Health URL  : http://localhost:5000/api/v1/health
+ Allowed CORS: "http://localhost:5173"
+================================================================
+```
+
+### Terminal 2: Frontend Vite Development Server
+```bash
+cd client
+npm run dev
+```
+Output:
+```
+  VITE v8.3.x  ready in ~500 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+```
+
+Open your browser at **[http://localhost:5173/](http://localhost:5173/)** to access LIBFLOW.
+
+---
+
+## 🧪 Testing, Linting & Quality Verification
+
+All test suites and build pipelines can be executed with standard npm scripts:
+
+### Frontend Client Quality Checks
+```bash
+cd client
+
+# Run all 208 client domain, RBAC, and mapper tests
+npm test
+
+# Run TypeScript compilation and production Vite build
+npm run build
+
+# Run Oxlint static code analysis
+npm run lint
+
+# Run security audit on client dependencies
+npm audit
+```
+
+### Backend Server Quality Checks
+```bash
+cd server
+
+# Run all 114 backend unit tests
+npm run test:unit
+
+# Run all 52 live MySQL integration tests (requires active MySQL)
+npm run test:integration
+
+# Run entire server test suite (unit + integration)
+npm test
+
+# Run TypeScript compilation build
+npm run build
+
+# Run security audit on server dependencies
+npm audit
+```
+
+---
+
+## 🎭 Demo Mode vs. Live Backend Mode
+
+LIBFLOW supports two distinct operational modes controlled via `VITE_AUTH_MODE` in `client/.env`:
+
+| Mode | Configuration | Characteristics | Typical Usage |
+| :--- | :--- | :--- | :--- |
+| **Demo Mode** | `VITE_AUTH_MODE=demo` | Self-contained client-side state stored in memory/localStorage. Instant quick-login buttons. Works without backend or MySQL. | Offline evaluation, UI walkthroughs, rapid portfolio exploration. |
+| **Live Backend Mode** | `VITE_AUTH_MODE=live` | Connects directly to the Express backend and MySQL database via HttpOnly cookie sessions (`libflow_session`). Strict server-side RBAC and real-time database persistence. | Production, full-stack integration testing, real library operations. |
+
+---
+
+## 🔐 Seed Accounts & Demo Access
+
+The database seed migrations include pre-configured accounts matching both live MySQL and demo fixtures:
+
+| Role | Email Identifier | Password | Access Scope |
+| :--- | :--- | :--- | :--- |
+| **System Administrator** | `admin@libflow.demo` *(or `admin@libflow.io`)* | `AdminPass123!` | System settings, member registry, fine waivers, analytics. |
+| **Circulation Librarian** | `librarian@libflow.demo` *(or `librarian@libflow.io`)* | `StaffPass123!` | Front desk, issue/return scanner, hold pickup claims, payments. |
+| **Institutional Patron** | `member@libflow.demo` *(or `student@libflow.io`)* | `MemberPass123!` | Catalog discovery, digital card, personal loans, hold queues, dues. |
+
+*Quick Access Tip:* On the [Login Page](http://localhost:5173/login), click the helper pills (**Admin**, **Librarian**, **Member**) to automatically populate credentials.
 
 ---
 
 ## 🔌 REST API Specification
 
-All responses adhere to the standard envelope:
+All API endpoints reside under `/api/v1` and return standardized envelopes:
 ```json
 {
   "success": true,
@@ -238,123 +424,67 @@ All responses adhere to the standard envelope:
 }
 ```
 
-### Key Endpoints
-- `POST /api/v1/auth/login` — Authenticate and receive JWT session
-- `GET /api/v1/books` — Faceted catalog search with pagination
-- `POST /api/v1/books` — Register bibliographic record (Librarian/Admin)
-- `GET /api/v1/books/:id/copies` — Retrieve all physical copies and shelf locations
-- `POST /api/v1/borrowings/issue` — Issue physical copy to member
-- `POST /api/v1/borrowings/return` — Check in physical copy & compute late penalties
-- `POST /api/v1/reservations` — Reserve unavailable title
-- `GET /api/v1/fines` — Query institutional fine ledger
-- `POST /api/v1/fines/:id/waive` — Authorize fine waiver (Admin only)
-- `GET /api/v1/analytics/overview` — High-level dashboard circulation metrics
+### Key API Endpoints
+
+| Category | Method | Path | Required Role | Description |
+| :--- | :---: | :--- | :---: | :--- |
+| **System** | `GET` | `/api/v1/health` | Public | System status, memory telemetry, and MySQL connection health. |
+| **Auth** | `POST` | `/api/v1/auth/login` | Public | Authenticate user, issue HttpOnly session and CSRF cookies. |
+| | `POST` | `/api/v1/auth/logout` | Authenticated | Invalidate server session and clear session cookies. |
+| | `GET` | `/api/v1/auth/me` | Authenticated | Retrieve authenticated user profile and member attributes. |
+| | `POST` | `/api/v1/auth/forgot-password`| Public | Request password recovery email (anti-enumeration). |
+| | `POST` | `/api/v1/auth/reset-password` | Public | Consume single-use cryptographic recovery token. |
+| **Books** | `GET` | `/api/v1/books` | Authenticated | Faceted catalog search with pagination and category filters. |
+| | `POST` | `/api/v1/books` | Staff | Register bibliographic title record. |
+| | `GET` | `/api/v1/books/:id/copies` | Authenticated | List physical copies (cost redacted for patrons). |
+| | `POST` | `/api/v1/books/:id/copies` | Staff | Add serialized physical copy with barcode and shelf location. |
+| **Circulation** | `POST` | `/api/v1/loans/checkout` | Staff | Issue an available physical copy to a verified member. |
+| | `GET` | `/api/v1/loans/me` | Member | Retrieve patron's active and historical loans. |
+| | `POST` | `/api/v1/loans/:id/return` | Staff | Process return, assess overdue penalties, and stage holds. |
+| | `POST` | `/api/v1/loans/:id/renew` | Member/Staff | Extend active loan due date (subject to hold conflicts). |
+| **Holds** | `POST` | `/api/v1/reservations` | Authenticated | Place a hold in the FIFO reservation waitlist. |
+| | `GET` | `/api/v1/reservations/me` | Member | Retrieve member's personal hold queue positions. |
+| | `POST` | `/api/v1/reservations/:id/claim`| Staff | Fulfill a staged pickup reservation and generate loan. |
+| | `POST` | `/api/v1/reservations/:id/cancel`| Patron/Staff| Cancel a hold and shift queue seniority forward. |
+| **Fines** | `GET` | `/api/v1/fines/me` | Member | Retrieve member's outstanding fine ledger. |
+| | `POST` | `/api/v1/fines/:id/pay` | Staff/Member | Record partial or full fine payment. |
+| | `POST` | `/api/v1/fines/:id/waive` | **ADMIN** | Waive fine balance with mandatory audited justification. |
+| **Analytics**| `GET` | `/api/v1/analytics/dashboard` | Staff | System metrics, category breakdown, and fine recovery. |
+| **Barcodes** | `GET` | `/api/v1/barcodes/scan/:code`| Authenticated | Scan copy or member card barcode with privacy protection. |
+
+*For complete details, see [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md).*
 
 ---
 
-## 🚀 Installation & Running Locally
+## 🔒 Security Controls & Known Limitations
 
-### Prerequisites
-- **Node.js**: v24+ (LTS)
-- **npm**: v11+
-- **MySQL Server**: MySQL 8.0+ Community Server or Enterprise
+### Security Architecture
+- **HttpOnly Cookie Sessions:** Neutralizes JavaScript credential theft via XSS.
+- **Double-Submit Anti-CSRF:** Requires matching `x-csrf-token` header on all modifying requests.
+- **Strict Parameterization:** Prohibits raw SQL concatenation via `mysql2` placeholders.
+- **Password Protection:** 12-round `bcrypt` salting; zero password hashes returned in API envelopes.
+- **Brute-Force Defense:** Rate limiters block rapid password guessing attacks.
 
-### 1. Clone & Setup Repository
-```bash
-git clone https://github.com/your-username/libflow.git
-cd libflow
-```
-
-### 2. Configure Environment Variables
-Copy `.env.example` to `.env` in both client and server directories:
-```bash
-cp server/.env.example server/.env
-cp client/.env.example client/.env
-```
-
-### 3. Install Dependencies
-```bash
-# Install Server Dependencies
-cd server
-npm install
-
-# Install Client Dependencies
-cd ../client
-npm install
-```
-
-### 4. Run Relational Database Migrations
-```bash
-cd ../server
-npm run migrate
-```
-
-### 5. Launch Development Environment
-```bash
-# In terminal 1 (Server - Port 5000)
-cd server
-npm run dev
-
-# In terminal 2 (Client - Port 5173)
-cd client
-npm run dev
-```
-
-Visit `http://localhost:5173` to explore LIBFLOW.
+### Known Limitations (V1 Scope)
+- **Single Active Tenant:** Relational schemas include `tenant_id` on all tables, but automated tenant subdomain switching is scheduled for V2.
+- **Hardware Integration:** Barcode input is handled via keyboard emulation and simulated QR events rather than native WebUSB/WebBluetooth drivers.
+- **Cron Jobs:** Overdue penalty assessments run via in-process Node.js schedules (`node-cron`) rather than external distributed queue infrastructure.
 
 ---
 
-## 🔐 Demo Credentials
+## 🔧 Troubleshooting Guide
 
-> ⚠️ **NOTICE:** Demo credentials are provided strictly for local development and portfolio evaluation. Never use demo passwords in production environments.
-
-| Role | Email | Password | Permissions |
-| :--- | :--- | :--- | :--- |
-| **Admin** | `admin@libflow.io` | `AdminPass123!` | Full institutional management, fine waivers, settings |
-| **Librarian** | `librarian@libflow.io` | `StaffPass123!` | Desk circulation, inventory, check-in, check-out |
-| **Member (Student)** | `student@libflow.io` | `MemberPass123!` | Catalog discovery, holds, personal loans, fines |
-
----
-
-## 🧪 Testing
-
-```bash
-# Run backend business logic & API tests
-cd server
-npm test
-
-# Run frontend test suite
-cd ../client
-npm test
-```
-
----
-
-## 🌐 Deployment
-
-- **Backend:** Ready for containerized deployment on Render, Railway, AWS ECS, or DigitalOcean.
-- **Frontend:** Optimized for Vercel, Netlify, or Cloudflare Pages.
-- **Docker:** Production `Dockerfile` and `docker-compose.yml` provided for containerized deployment.
-
----
-
-## 🗺 Future Enhancements & Multi-Tenancy
-
-- **Multi-Tenant Cloud:** Dynamic tenant resolution by subdomain (`harvard.libflow.io`), complete database partition isolation.
-- **Hardware Integration:** Web Bluetooth / USB support for physical handheld barcode and RFID readers.
-- **Machine Learning Recommendations:** Collaborative filtering engine trained on borrowing co-occurrences.
-
----
-
-## 🤝 Contribution Guidelines
-
-1. Fork the Project.
-2. Create your Feature Branch (`git checkout -b feature/CirculationEngine`).
-3. Commit your Changes (`git commit -m 'feat: add overdue grace period calculator'`).
-4. Push to the Branch (`git push origin feature/CirculationEngine`).
-5. Open a Pull Request.
+| Issue | Probable Cause | Verified Resolution |
+| :--- | :--- | :--- |
+| **`ECONNREFUSED 127.0.0.1:3306`** | MySQL server is stopped or port is blocked. | Verify MySQL service is running via Windows Services (`services.msc`) or run `net start MySQL80`. Check `DB_PORT=3306` in `server/.env`. |
+| **`ER_ACCESS_DENIED_ERROR`** | Invalid database credentials in `server/.env`. | Verify `DB_USER` and `DB_PASSWORD` in `server/.env` match your MySQL account permissions. |
+| **CORS Blocked in Browser** | Origin mismatch between client and server. | Ensure `CORS_ORIGIN=http://localhost:5173` in `server/.env` and `CLIENT_URL=http://localhost:5173`. |
+| **Login says "Authentication Failed"** | Incorrect mode or unmigrated database. | Ensure migrations were executed (`npm run migrate`). Use the quick seed buttons on the login page. |
+| **Port 5000 / 5173 Already in Use** | A previous instance is still running in the background. | In PowerShell: `Get-Process node \| Stop-Process` or kill background tasks via `npm run dev`. |
+| **Anti-CSRF Validation Failed (403)** | Missing `x-csrf-token` header or expired cookie. | Ensure browser accepts cookies. Log in again to re-issue session and CSRF cookies. |
 
 ---
 
 ## 📄 License
+
 Distributed under the MIT License. See `LICENSE` for more information.

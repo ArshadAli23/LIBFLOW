@@ -22,7 +22,7 @@ export interface ActiveMemberState {
 
 export function useActiveMember(): ActiveMemberState {
   const { user, role } = useAuth();
-  const { members, getMemberById } = useMembers();
+  const { members, currentMember, getMemberById } = useMembers();
 
   return useMemo(() => {
     if (!user || role !== 'MEMBER') {
@@ -35,7 +35,7 @@ export function useActiveMember(): ActiveMemberState {
       };
     }
 
-    let resolvedMember: Member | undefined;
+    let resolvedMember: Member | undefined = currentMember || undefined;
 
     // 1. Resolve by explicit memberId on user session
     if (user.memberId) {
@@ -68,13 +68,24 @@ export function useActiveMember(): ActiveMemberState {
       };
     }
 
+    // 5. Patron authenticated with linked memberId from backend session
+    if (user.memberId) {
+      return {
+        member: null,
+        memberId: user.memberId,
+        domainId: user.id || null,
+        isLinked: true,
+        userRole: role,
+      };
+    }
+
     // Patron authenticated without an linked institutional membership card
     return {
       member: null,
-      memberId: user.memberId || null,
-      domainId: null,
+      memberId: null,
+      domainId: user.id || null,
       isLinked: false,
       userRole: role,
     };
-  }, [user, role, members, getMemberById]);
+  }, [user, role, members, getMemberById, currentMember]);
 }

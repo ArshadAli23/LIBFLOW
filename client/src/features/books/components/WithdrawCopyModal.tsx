@@ -10,13 +10,14 @@ import { ShieldAlert, AlertTriangle } from 'lucide-react';
 import { Modal } from '../../../components/ui/Modal';
 import { FormField, Input } from '../../../components/forms/FormControls';
 import { Button } from '../../../components/ui/Button';
+import { Alert } from '../../../components/feedback/FeedbackStates';
 import type { BookCopy } from '../types';
 
 export interface WithdrawCopyModalProps {
   isOpen: boolean;
   onClose: () => void;
   copy: BookCopy | null;
-  onConfirmWithdraw: (copyId: string, reason: string) => void;
+  onConfirmWithdraw: (copyId: string, reason: string) => Promise<unknown> | void;
 }
 
 export const WithdrawCopyModal: React.FC<WithdrawCopyModalProps> = ({
@@ -26,12 +27,28 @@ export const WithdrawCopyModal: React.FC<WithdrawCopyModalProps> = ({
   onConfirmWithdraw,
 }) => {
   const [reason, setReason] = useState('Physical wear & binding degradation');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   if (!copy) return null;
 
-  const handleConfirm = () => {
-    onConfirmWithdraw(copy.id, reason);
-    onClose();
+  const handleConfirm = async () => {
+    setSubmitError(null);
+    if (!reason.trim() || reason.trim().length < 3) {
+      setSubmitError('A justification of at least 3 characters is required.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onConfirmWithdraw(copy.id, reason.trim());
+      setIsSubmitting(false);
+      onClose();
+    } catch (err: unknown) {
+      setIsSubmitting(false);
+      const msg = err instanceof Error ? err.message : 'Failed to withdraw physical copy.';
+      setSubmitError(msg);
+    }
   };
 
   return (
@@ -43,12 +60,13 @@ export const WithdrawCopyModal: React.FC<WithdrawCopyModalProps> = ({
       size="md"
       footer={
         <>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button
             variant="destructive"
             size="sm"
+            isLoading={isSubmitting}
             leftIcon={<ShieldAlert className="w-4 h-4" />}
             onClick={handleConfirm}
           >
@@ -58,6 +76,15 @@ export const WithdrawCopyModal: React.FC<WithdrawCopyModalProps> = ({
       }
     >
       <div className="space-y-4">
+        {submitError && (
+          <Alert
+            variant="error"
+            title="Withdrawal Failed"
+            description={submitError}
+            onClose={() => setSubmitError(null)}
+          />
+        )}
+
         {/* Warning Explanation Box */}
         <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-2">
           <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-semibold">

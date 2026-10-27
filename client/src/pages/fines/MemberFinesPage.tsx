@@ -8,12 +8,14 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { EmptyState } from '../../components/feedback/FeedbackStates';
 import { formatCurrency } from '../../features/fines/finePolicy';
+import { useAuth } from '../../auth/AuthContext';
 import {
   DollarSign,
   CheckCircle2,
   AlertCircle,
   Receipt,
   Info,
+  RefreshCw,
 } from 'lucide-react';
 
 import { useActiveMember } from '../../features/members/useActiveMember';
@@ -24,13 +26,18 @@ export interface MemberFinesPageProps {
 
 export const MemberFinesPage: React.FC<MemberFinesPageProps> = ({ onNavigate }) => {
   const { domainId, memberId, isLinked } = useActiveMember();
-  const { getFinesForMember, policy } = useFines();
+  const { fines, getFinesForMember, policy, isLoading, error, clearError, fetchFines } = useFines();
+  const { authMode } = useAuth();
 
   // Isolate fines to verified active patron identity only
   const memberFines = React.useMemo(() => {
+    if (authMode === 'live') {
+      // In live mode, /api/v1/fines/me returns strictly authenticated member's liabilities
+      return fines;
+    }
     if (!domainId && !memberId) return [];
     return getFinesForMember(domainId || memberId || '');
-  }, [domainId, memberId, getFinesForMember]);
+  }, [authMode, fines, domainId, memberId, getFinesForMember]);
 
   const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
   const [selectedFineForDetail, setSelectedFineForDetail] = useState<Fine | null>(null);
@@ -38,7 +45,7 @@ export const MemberFinesPage: React.FC<MemberFinesPageProps> = ({ onNavigate }) 
   const activeFines = memberFines.filter((f) => f.status === 'UNPAID' || f.status === 'PARTIALLY_PAID');
   const settledFines = memberFines.filter((f) => f.status === 'PAID' || f.status === 'WAIVED');
 
-  const totalOutstanding = activeFines.reduce((sum, f) => sum + f.balance, 0);
+  const totalOutstanding = activeFines.reduce((sum, f) => sum + (Number(f.balance) || 0), 0);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -62,6 +69,18 @@ export const MemberFinesPage: React.FC<MemberFinesPageProps> = ({ onNavigate }) 
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
+          {authMode === 'live' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => fetchFines().catch(() => {})}
+              isLoading={isLoading}
+              leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />}
+              className="text-xs"
+            >
+              Sync Dues
+            </Button>
+          )}
           <Button
             variant="secondary"
             size="sm"
@@ -72,6 +91,27 @@ export const MemberFinesPage: React.FC<MemberFinesPageProps> = ({ onNavigate }) 
           </Button>
         </div>
       </div>
+
+      {/* Actionable Error Alert */}
+      {error && (
+        <div className="p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400 flex items-center justify-between gap-3 text-xs font-mono">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              clearError();
+              fetchFines().catch(() => {});
+            }}
+            className="text-xs shrink-0"
+          >
+            Retry
+          </Button>
+        </div>
+      )}
 
       {/* Friendly Student Balance Banner */}
       {totalOutstanding > 0 ? (
@@ -128,175 +168,185 @@ export const MemberFinesPage: React.FC<MemberFinesPageProps> = ({ onNavigate }) 
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-border-subtle text-xs font-mono">
-        <button
-          type="button"
-          onClick={() => setActiveTab('active')}
-          className={`pb-2.5 px-3 font-semibold border-b-2 transition-all flex items-center gap-2 ${
-            activeTab === 'active'
-              ? 'border-brand text-brand'
-              : 'border-transparent text-canvas-muted hover:text-canvas-text'
-          }`}
-        >
-          <AlertCircle className="w-3.5 h-3.5" />
-          <span>Active Dues ({activeFines.length})</span>
-        </button>
+      {/* Loading Indicator */}
+      {isLoading && memberFines.length === 0 ? (
+        <div className="p-12 text-center rounded-2xl border border-border-subtle bg-surface space-y-3 shadow-card">
+          <RefreshCw className="w-6 h-6 animate-spin text-brand mx-auto" />
+          <p className="text-xs font-mono text-canvas-muted">Loading your library financial obligations...</p>
+        </div>
+      ) : (
+        <>
+          {/* Tabs */}
+          <div className="flex items-center gap-2 border-b border-border-subtle text-xs font-mono">
+            <button
+              type="button"
+              onClick={() => setActiveTab('active')}
+              className={`pb-2.5 px-3 font-semibold border-b-2 transition-all flex items-center gap-2 ${
+                activeTab === 'active'
+                  ? 'border-brand text-brand'
+                  : 'border-transparent text-canvas-muted hover:text-canvas-text'
+              }`}
+            >
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>Active Dues ({activeFines.length})</span>
+            </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab('history')}
-          className={`pb-2.5 px-3 font-semibold border-b-2 transition-all flex items-center gap-2 ${
-            activeTab === 'history'
-              ? 'border-brand text-brand'
-              : 'border-transparent text-canvas-muted hover:text-canvas-text'
-          }`}
-        >
-          <Receipt className="w-3.5 h-3.5" />
-          <span>Settled History ({settledFines.length})</span>
-        </button>
-      </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('history')}
+              className={`pb-2.5 px-3 font-semibold border-b-2 transition-all flex items-center gap-2 ${
+                activeTab === 'history'
+                  ? 'border-brand text-brand'
+                  : 'border-transparent text-canvas-muted hover:text-canvas-text'
+              }`}
+            >
+              <Receipt className="w-3.5 h-3.5" />
+              <span>Settled History ({settledFines.length})</span>
+            </button>
+          </div>
 
-      {/* Tab 1: Active Dues */}
-      {activeTab === 'active' && (
-        <div className="space-y-4">
-          {!isLinked ? (
-            <EmptyState
-              icon={<AlertCircle className="w-8 h-8 text-amber-500" />}
-              title="Institutional Membership Pending"
-              description="Your account is not currently linked to an active library membership card. Please visit the circulation desk to link your patron profile."
-            />
-          ) : activeFines.length === 0 ? (
-            <EmptyState
-              icon={<CheckCircle2 className="w-8 h-8 text-emerald-500" />}
-              title="No outstanding library fines"
-              description="Your record is completely clear. You have no pending late fees, damaged copy dues, or administrative charges."
-            />
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {activeFines.map((fine) => (
-                <div
-                  key={fine.id}
-                  className="p-5 rounded-2xl border border-border-subtle bg-surface shadow-card flex flex-col justify-between space-y-4 hover:border-brand/40 transition-all"
-                >
-                  <div className="flex items-start gap-4">
-                    <BookCover
-                      title={fine.bookTitle}
-                      author="Library Collection"
-                      size="md"
-                      className="w-16 h-22 shrink-0 rounded-md shadow-md"
-                    />
-
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-[10px] text-brand font-semibold px-2 py-0.5 rounded bg-brand/10 border border-brand/20">
-                          {fine.fineNumber}
-                        </span>
-                        <FineStatusBadge status={fine.status} size="sm" />
-                      </div>
-
-                      <h3 className="font-serif font-bold text-base text-canvas-text leading-tight truncate">
-                        {fine.bookTitle}
-                      </h3>
-
-                      <p className="text-xs text-canvas-muted truncate">
-                        Reason: {fine.reason === 'OVERDUE' ? 'Overdue Return' : fine.reason === 'DAMAGED_ITEM' ? 'Physical Wear' : fine.reason}
-                      </p>
-
-                      <div className="flex items-center gap-3 text-[11px] font-mono text-canvas-muted pt-1">
-                        <span>Due: {new Date(fine.dueDate).toLocaleDateString()}</span>
-                        {fine.daysOverdue > 0 && (
-                          <>
-                            <span>•</span>
-                            <span className="text-amber-600 dark:text-amber-400 font-semibold">{fine.daysOverdue} days late</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Financial Breakdown Strip */}
-                  <div className="pt-3 border-t border-border-subtle flex items-center justify-between text-xs font-mono">
-                    <div>
-                      <span className="text-[10px] text-canvas-muted block">Remaining Due</span>
-                      <FineAmount
-                        amount={fine.balance}
-                        currencySymbol={policy.currencySymbol}
-                        size="md"
-                        variant="danger"
-                      />
-                    </div>
-
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setSelectedFineForDetail(fine)}
-                      className="text-xs h-8"
+          {/* Tab 1: Active Dues */}
+          {activeTab === 'active' && (
+            <div className="space-y-4">
+              {authMode !== 'live' && !isLinked ? (
+                <EmptyState
+                  icon={<AlertCircle className="w-8 h-8 text-amber-500" />}
+                  title="Institutional Membership Pending"
+                  description="Your account is not currently linked to an active library membership card. Please visit the circulation desk to link your patron profile."
+                />
+              ) : activeFines.length === 0 ? (
+                <EmptyState
+                  icon={<CheckCircle2 className="w-8 h-8 text-emerald-500" />}
+                  title="No outstanding library fines"
+                  description="Your record is completely clear. You have no pending late fees, damaged copy dues, or administrative charges."
+                />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {activeFines.map((fine) => (
+                    <div
+                      key={fine.id}
+                      className="p-5 rounded-2xl border border-border-subtle bg-surface shadow-card flex flex-col justify-between space-y-4 hover:border-brand/40 transition-all"
                     >
-                      View Breakdown
-                    </Button>
-                  </div>
+                      <div className="flex items-start gap-4">
+                        <BookCover
+                          title={fine.bookTitle}
+                          author="Library Collection"
+                          size="md"
+                          className="w-16 h-22 shrink-0 rounded-md shadow-md"
+                        />
+
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-[10px] text-brand font-semibold px-2 py-0.5 rounded bg-brand/10 border border-brand/20">
+                              {fine.fineNumber}
+                            </span>
+                            <FineStatusBadge status={fine.status} size="sm" />
+                          </div>
+
+                          <h3 className="font-serif font-bold text-base text-canvas-text leading-tight truncate">
+                            {fine.bookTitle}
+                          </h3>
+
+                          <p className="text-xs text-canvas-muted truncate">
+                            Reason: {fine.reason === 'OVERDUE' ? 'Overdue Return' : fine.reason === 'DAMAGED_ITEM' ? 'Physical Wear' : fine.reason}
+                          </p>
+
+                          <div className="flex items-center gap-3 text-[11px] font-mono text-canvas-muted pt-1">
+                            <span>Due: {new Date(fine.dueDate).toLocaleDateString()}</span>
+                            {fine.daysOverdue > 0 && (
+                              <>
+                                <span>•</span>
+                                <span className="text-amber-600 dark:text-amber-400 font-semibold">{fine.daysOverdue} days late</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Financial Breakdown Strip */}
+                      <div className="pt-3 border-t border-border-subtle flex items-center justify-between text-xs font-mono">
+                        <div>
+                          <span className="text-[10px] text-canvas-muted block">Remaining Due</span>
+                          <FineAmount
+                            amount={fine.balance}
+                            currencySymbol={policy.currencySymbol}
+                            size="md"
+                            variant="danger"
+                          />
+                        </div>
+
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setSelectedFineForDetail(fine)}
+                          className="text-xs h-8"
+                        >
+                          View Breakdown
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           )}
-        </div>
-      )}
 
-      {/* Tab 2: Settled History */}
-      {activeTab === 'history' && (
-        <div className="space-y-4">
-          {settledFines.length === 0 ? (
-            <EmptyState
-              icon={<Receipt className="w-8 h-8 text-canvas-muted" />}
-              title="No past settled fines"
-              description="Historical payment receipts and authorized waivers will appear here."
-            />
-          ) : (
-            <div className="space-y-3">
-              {settledFines.map((fine) => (
-                <div
-                  key={fine.id}
-                  className="p-4 rounded-xl border border-border-subtle bg-surface shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono"
-                >
-                  <div className="flex items-center gap-3.5">
-                    <BookCover
-                      title={fine.bookTitle}
-                      author="Library Collection"
-                      size="sm"
-                      className="w-8 h-11 shrink-0 rounded shadow-xs"
-                    />
-
-                    <div>
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="font-semibold text-canvas-text text-sm font-sans truncate max-w-md block">
-                          {fine.bookTitle}
-                        </span>
-                        <FineStatusBadge status={fine.status} size="sm" />
-                      </div>
-                      <p className="text-[11px] text-canvas-muted">
-                        Ref: {fine.fineNumber} · Original: {formatCurrency(fine.originalAmount, policy.currencySymbol)}
-                        {fine.amountPaid > 0 && ` · Paid: ${formatCurrency(fine.amountPaid, policy.currencySymbol)}`}
-                        {fine.waivedAmount > 0 && ` · Waived: ${formatCurrency(fine.waivedAmount, policy.currencySymbol)}`}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 self-end sm:self-auto">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedFineForDetail(fine)}
-                      className="text-xs h-7"
+          {/* Tab 2: Settled History */}
+          {activeTab === 'history' && (
+            <div className="space-y-4">
+              {settledFines.length === 0 ? (
+                <EmptyState
+                  icon={<Receipt className="w-8 h-8 text-canvas-muted" />}
+                  title="No past settled fines"
+                  description="Historical payment receipts and authorized waivers will appear here."
+                />
+              ) : (
+                <div className="space-y-3">
+                  {settledFines.map((fine) => (
+                    <div
+                      key={fine.id}
+                      className="p-4 rounded-xl border border-border-subtle bg-surface shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono"
                     >
-                      Receipt Details
-                    </Button>
-                  </div>
+                      <div className="flex items-center gap-3.5">
+                        <BookCover
+                          title={fine.bookTitle}
+                          author="Library Collection"
+                          size="sm"
+                          className="w-8 h-11 shrink-0 rounded shadow-xs"
+                        />
+
+                        <div>
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="font-semibold text-canvas-text text-sm font-sans truncate max-w-md block">
+                              {fine.bookTitle}
+                            </span>
+                            <FineStatusBadge status={fine.status} size="sm" />
+                          </div>
+                          <p className="text-[11px] text-canvas-muted">
+                            Ref: {fine.fineNumber} · Original: {formatCurrency(fine.originalAmount, policy.currencySymbol)}
+                            {fine.amountPaid > 0 && ` · Paid: ${formatCurrency(fine.amountPaid, policy.currencySymbol)}`}
+                            {fine.waivedAmount > 0 && ` · Waived: ${formatCurrency(fine.waivedAmount, policy.currencySymbol)}`}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 self-end sm:self-auto">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedFineForDetail(fine)}
+                          className="text-xs h-7"
+                        >
+                          Receipt Details
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           )}
-        </div>
+        </>
       )}
 
       {/* Student View Details Dialog */}

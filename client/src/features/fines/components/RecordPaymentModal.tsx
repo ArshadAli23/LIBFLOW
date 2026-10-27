@@ -17,7 +17,7 @@ export interface RecordPaymentModalProps {
     method: FinePaymentMethod,
     reference?: string,
     notes?: string
-  ) => void;
+  ) => Promise<void> | void;
 }
 
 export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
@@ -42,8 +42,10 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   if (!fine) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     const amountVal = Number(paymentAmount);
     if (!Number.isFinite(amountVal) || amountVal <= 0) {
       setError('Please enter a valid positive payment amount.');
@@ -55,9 +57,16 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
     }
 
     setIsSubmitting(true);
-    onConfirmPayment(fine.id, amountVal, method, reference.trim(), notes.trim());
-    setIsSubmitting(false);
-    onClose();
+    setError('');
+
+    try {
+      await onConfirmPayment(fine.id, amountVal, method, reference.trim(), notes.trim());
+      onClose();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to record payment. Please review and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const parsedAmount = Number(paymentAmount);
@@ -149,13 +158,15 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               { value: 'CAMPUS_CARD', label: 'University Campus Smartcard' },
               { value: 'CASH', label: 'Cash Desk Tender' },
               { value: 'UPI_ONLINE', label: 'UPI / Digital Kiosk Gateway' },
+              { value: 'CARD', label: 'Credit / Debit Card (Counter POS)' },
+              { value: 'ONLINE', label: 'Online Payment Gateway' },
             ]}
           />
         </FormField>
 
         {/* Transaction Reference & Notes */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <FormField label="Receipt / Slip Ref" description="Optional bank or terminal ref">
+          <FormField label="Receipt / Slip Ref" description="Optional bank or receipt slip ref">
             <Input
               value={reference}
               onChange={(e) => setReference(e.target.value)}

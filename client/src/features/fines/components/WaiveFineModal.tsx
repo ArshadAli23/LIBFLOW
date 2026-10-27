@@ -11,7 +11,7 @@ export interface WaiveFineModalProps {
   isOpen: boolean;
   onClose: () => void;
   fine: Fine | null;
-  onConfirmWaiver: (fineId: string, amount: number, reason: string, waivedBy: string) => void;
+  onConfirmWaiver: (fineId: string, amount: number, reason: string, waivedBy: string) => Promise<void> | void;
 }
 
 export const WaiveFineModal: React.FC<WaiveFineModalProps> = ({
@@ -38,8 +38,10 @@ export const WaiveFineModal: React.FC<WaiveFineModalProps> = ({
   const numericAmount = parseFloat(waiverAmount) || 0;
   const remainingAfterWaiver = Math.max(0, fine.balance - numericAmount);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     const amountVal = Number(waiverAmount);
     if (!Number.isFinite(amountVal) || amountVal <= 0) {
       setError('Please enter a valid positive waiver amount.');
@@ -49,15 +51,22 @@ export const WaiveFineModal: React.FC<WaiveFineModalProps> = ({
       setError(`Waiver amount cannot exceed current balance of ${formatCurrency(fine.balance)}.`);
       return;
     }
-    if (!reason.trim()) {
-      setError('A formal justification reason is required for administrative audit.');
+    if (!reason.trim() || reason.trim().length < 3) {
+      setError('A formal justification reason (minimum 3 characters) is required for administrative audit.');
       return;
     }
 
     setIsSubmitting(true);
-    onConfirmWaiver(fine.id, amountVal, reason.trim(), waivedBy.trim());
-    setIsSubmitting(false);
-    onClose();
+    setError('');
+
+    try {
+      await onConfirmWaiver(fine.id, amountVal, reason.trim(), waivedBy.trim());
+      onClose();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to authorize waiver. Please review and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

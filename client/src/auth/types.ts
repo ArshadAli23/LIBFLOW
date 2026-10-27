@@ -22,13 +22,16 @@ export interface User {
   status: 'ACTIVE' | 'SUSPENDED';
 }
 
+export type AuthMode = 'demo' | 'live';
+
 export interface AuthContextType {
   user: User | null;
   role: UserRole | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (emailOrRole: string) => Promise<{ success: boolean; role?: UserRole; error?: string }>;
-  logout: () => void;
+  authMode: AuthMode;
+  login: (emailOrRole: string, password?: string) => Promise<{ success: boolean; role?: UserRole; error?: string }>;
+  logout: () => Promise<void> | void;
   hasRole: (allowedRoles: UserRole[]) => boolean;
   switchDemoRole: (role: UserRole) => void;
 }

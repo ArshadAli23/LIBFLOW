@@ -36,7 +36,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
           >
             <LibflowLogo size="md" />
             <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider bg-canvas-subtle border border-border-subtle text-canvas-muted">
-              v1.1 OS
+              v1.1
             </span>
           </div>
         </div>

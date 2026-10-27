@@ -9,9 +9,9 @@
 
 export type FineStatus = 'UNPAID' | 'PARTIALLY_PAID' | 'PAID' | 'WAIVED';
 
-export type FineReason = 'OVERDUE' | 'DAMAGED_ITEM' | 'LOST_ITEM' | 'PROCESSING_FEE';
+export type FineReason = 'OVERDUE' | 'DAMAGED_ITEM' | 'LOST_ITEM' | 'PROCESSING_FEE' | 'OTHER';
 
-export type FinePaymentMethod = 'CASH' | 'CAMPUS_CARD' | 'UPI_ONLINE' | 'WAIVER';
+export type FinePaymentMethod = 'CASH' | 'CAMPUS_CARD' | 'UPI_ONLINE' | 'CARD' | 'ONLINE' | 'WAIVER' | 'BANK_TRANSFER';
 
 export interface FinePaymentRecord {
   id: string;

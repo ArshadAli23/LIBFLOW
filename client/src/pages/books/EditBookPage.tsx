@@ -6,14 +6,15 @@
  * Physical copy accessioning and shelf locations remain strictly managed under the Copies view.
  */
 
-import React, { useState } from 'react';
-import { ArrowLeft, Save, Copy } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Save, Copy, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useBooks } from '../../features/books/BooksContext';
 import { BookCover } from '../../features/books/components/BookCover';
 import { FormField, Input, Textarea, Select } from '../../components/forms/FormControls';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/data-display/Cards';
+import { Alert, Spinner } from '../../components/feedback/FeedbackStates';
 import type { BookFormat } from '../../features/books/types';
 
 export interface EditBookPageProps {
@@ -22,8 +23,8 @@ export interface EditBookPageProps {
 }
 
 export const EditBookPage: React.FC<EditBookPageProps> = ({ bookId, onNavigate }) => {
-  const { user } = useAuth();
-  const { getBookById, updateBook } = useBooks();
+  const { user, authMode } = useAuth();
+  const { getBookById, updateBook, fetchBookById } = useBooks();
 
   const book = getBookById(bookId);
 
@@ -48,6 +49,93 @@ export const EditBookPage: React.FC<EditBookPageProps> = ({ bookId, onNavigate }
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isLoadingRecord, setIsLoadingRecord] = useState(!book && authMode === 'live');
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // LIVE MODE: Fetch book record if not present in memory cache
+  useEffect(() => {
+    if (!book && authMode === 'live') {
+      setIsLoadingRecord(true);
+      setLoadError(null);
+      fetchBookById(bookId)
+        .then((fetched) => {
+          setIsLoadingRecord(false);
+          if (fetched) {
+            setTitle(fetched.title);
+            setSubtitle(fetched.subtitle || '');
+            setAuthors(fetched.authors.join(', '));
+            setIsbn(fetched.isbn);
+            setPublisher(fetched.publisher);
+            setPublicationYear(String(fetched.publicationYear));
+            setEdition(fetched.edition || '');
+            setLanguage(fetched.language || 'English');
+            setFormat(fetched.format);
+            setCategory(fetched.category);
+            setSubcategory(fetched.subcategory || '');
+            setTags(fetched.tags.join(', '));
+            setDescription(fetched.description || '');
+            setCoverUrl(fetched.coverUrl || '');
+            setSubject(fetched.subject || '');
+            setCallNumber(fetched.callNumber || '');
+            setDeweyDecimal(fetched.deweyDecimal || '');
+          }
+        })
+        .catch((err) => {
+          setIsLoadingRecord(false);
+          setLoadError(err instanceof Error ? err.message : 'Failed to retrieve book record.');
+        });
+    }
+  }, [book, authMode, bookId, fetchBookById]);
+
+  if (isLoadingRecord) {
+    return (
+      <div className="py-20 flex flex-col items-center justify-center space-y-3 bg-surface rounded-xl border border-border-subtle shadow-card max-w-5xl mx-auto">
+        <Spinner size="lg" />
+        <span className="text-xs font-mono text-canvas-muted">Loading bibliographic record...</span>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="space-y-4 max-w-5xl mx-auto py-8">
+        <Alert
+          variant="error"
+          title="Error Loading Record"
+          description={loadError}
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+              onClick={() => {
+                setIsLoadingRecord(true);
+                setLoadError(null);
+                fetchBookById(bookId)
+                  .then(() => setIsLoadingRecord(false))
+                  .catch((err) => {
+                    setIsLoadingRecord(false);
+                    setLoadError(err instanceof Error ? err.message : 'Failed to retrieve book record.');
+                  });
+              }}
+              className="text-xs mt-2"
+            >
+              Retry
+            </Button>
+          }
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<ArrowLeft className="w-4 h-4" />}
+          onClick={() => onNavigate('admin/collection/books')}
+        >
+          Return to Catalog
+        </Button>
+      </div>
+    );
+  }
 
   if (!book) {
     return (
@@ -78,7 +166,8 @@ export const EditBookPage: React.FC<EditBookPageProps> = ({ bookId, onNavigate }
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setSubmitError(null);
     if (!validate()) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -96,34 +185,52 @@ export const EditBookPage: React.FC<EditBookPageProps> = ({ bookId, onNavigate }
       .map((t) => t.trim().replace(/^#/, ''))
       .filter(Boolean);
 
-    updateBook(book.id, {
-      title: title.trim(),
-      subtitle: subtitle.trim() || undefined,
-      authors: authorList,
-      isbn: isbn.trim(),
-      publisher: publisher.trim(),
-      publicationYear: parseInt(publicationYear, 10) || book.publicationYear,
-      edition: edition.trim() || undefined,
-      language: language.trim() || 'English',
-      format,
-      category: category.trim(),
-      subcategory: subcategory.trim() || undefined,
-      tags: tagList,
-      description: description.trim(),
-      coverUrl: coverUrl.trim() || undefined,
-      subject: subject.trim() || undefined,
-      callNumber: callNumber.trim() || undefined,
-      deweyDecimal: deweyDecimal.trim() || undefined,
-      updatedBy: user?.name || 'Administrator',
-    });
+    try {
+      await updateBook(book.id, {
+        title: title.trim(),
+        subtitle: subtitle.trim() || undefined,
+        authors: authorList,
+        isbn: isbn.trim(),
+        publisher: publisher.trim(),
+        publicationYear: parseInt(publicationYear, 10) || book.publicationYear,
+        edition: edition.trim() || undefined,
+        language: language.trim() || 'English',
+        format,
+        category: category.trim(),
+        subcategory: subcategory.trim() || undefined,
+        tags: tagList,
+        description: description.trim(),
+        coverUrl: coverUrl.trim() || undefined,
+        subject: subject.trim() || undefined,
+        callNumber: callNumber.trim() || undefined,
+        deweyDecimal: deweyDecimal.trim() || undefined,
+        updatedBy: user?.name || 'Administrator',
+      });
 
-    setIsSubmitting(false);
-    onNavigate(`admin/collection/books/${book.id}`);
+      setIsSubmitting(false);
+      onNavigate(`admin/collection/books/${book.id}`);
+    } catch (err: unknown) {
+      setIsSubmitting(false);
+      const msg = err instanceof Error ? err.message : 'Failed to update bibliographic record.';
+      setSubmitError(msg);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto animate-in fade-in duration-200">
+      {/* Update Error Banner */}
+      {submitError && (
+        <Alert
+          variant="error"
+          title="Update Failed"
+          description={submitError}
+          onClose={() => setSubmitError(null)}
+        />
+      )}
+
       {/* Header & Breadcrumb */}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border-subtle">
         <div>
           <button

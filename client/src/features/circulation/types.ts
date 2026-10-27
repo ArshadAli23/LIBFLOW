@@ -7,7 +7,7 @@
  * - Stricly separated from BOOK (bibliographic record) and FINE (future financial engine).
  */
 
-export type LoanStatus = 'ACTIVE' | 'OVERDUE' | 'RETURNED' | 'LOST';
+export type LoanStatus = 'ACTIVE' | 'OVERDUE' | 'RETURNED' | 'LOST' | 'DAMAGED';
 
 export interface Loan {
   id: string;                    // e.g. "loan_001"

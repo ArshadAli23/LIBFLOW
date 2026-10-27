@@ -5,25 +5,32 @@ import { LoanStatusBadge } from '../../features/circulation/components/LoanStatu
 import { RenewLoanModal } from '../../features/circulation/components/RenewLoanModal';
 import { BookCover } from '../../features/books/components/BookCover';
 import { Button } from '../../components/ui/Button';
-import { EmptyState } from '../../components/feedback/FeedbackStates';
+import { EmptyState, LoadingState, Alert } from '../../components/feedback/FeedbackStates';
 import { useToast } from '../../context/ToastContext';
-import { BookOpen, RotateCcw, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { BookOpen, RotateCcw, Clock, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 
 import { useActiveMember } from '../../features/members/useActiveMember';
+import { useAuth } from '../../auth/AuthContext';
 
 export interface MemberLoansPageProps {
   onNavigate: (path: string) => void;
 }
 
 export const MemberLoansPage: React.FC<MemberLoansPageProps> = ({ onNavigate }) => {
+  const { user, role, authMode } = useAuth();
   const { memberId, isLinked } = useActiveMember();
-  const { getLoansForMember, renewLoan } = useCirculation();
+  const { loans, getLoansForMember, renewLoan, isLoading, error, fetchLoans, clearError } = useCirculation();
   const { addToast } = useToast();
 
+  const isPatronLinked = isLinked || (authMode === 'live' && !!user);
+
   const myLoans = useMemo(() => {
+    if (authMode === 'live' && role === 'MEMBER') {
+      return loans;
+    }
     if (!memberId) return [];
     return getLoansForMember(memberId);
-  }, [memberId, getLoansForMember]);
+  }, [authMode, role, loans, memberId, getLoansForMember]);
 
   const [activeTab, setActiveTab] = useState<'ACTIVE' | 'HISTORY'>('ACTIVE');
   const [selectedLoanForRenew, setSelectedLoanForRenew] = useState<Loan | null>(null);
@@ -40,14 +47,15 @@ export const MemberLoansPage: React.FC<MemberLoansPageProps> = ({ onNavigate }) 
 
   const displayedLoans = activeTab === 'ACTIVE' ? activeLoans : historyLoans;
 
-  const handleConfirmRenew = (loanId: string) => {
-    const res = renewLoan(loanId);
+  const handleConfirmRenew = async (loanId: string) => {
+    const res = await renewLoan(loanId);
     if (res.success && res.loan) {
       addToast({
         title: 'Loan Extended',
         message: `Your loan for "${res.loan.bookTitle}" has been extended by 14 days. New due date: ${res.loan.dueDate}.`,
         type: 'success',
       });
+      setSelectedLoanForRenew(null);
     } else {
       addToast({
         title: 'Renewal Failed',
@@ -81,16 +89,43 @@ export const MemberLoansPage: React.FC<MemberLoansPageProps> = ({ onNavigate }) 
           </p>
         </div>
 
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => onNavigate('member/library/books')}
-          leftIcon={<BookOpen className="w-3.5 h-3.5" />}
-          className="text-xs self-start sm:self-auto"
-        >
-          Browse Library Catalog
-        </Button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => fetchLoans()}
+            leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />}
+            className="text-xs"
+            disabled={isLoading}
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => onNavigate('member/library/books')}
+            leftIcon={<BookOpen className="w-3.5 h-3.5" />}
+            className="text-xs"
+          >
+            Browse Library Catalog
+          </Button>
+        </div>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert
+          variant="error"
+          title="Could not load reading shelf"
+          description={error}
+          onClose={clearError}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => fetchLoans()}>
+              Retry
+            </Button>
+          }
+        />
+      )}
 
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-border-subtle text-xs font-mono">
@@ -122,7 +157,9 @@ export const MemberLoansPage: React.FC<MemberLoansPageProps> = ({ onNavigate }) 
       </div>
 
       {/* Loans Grid / Cards */}
-      {!isLinked ? (
+      {isLoading && myLoans.length === 0 ? (
+        <LoadingState message="Loading your reading shelf from library registry..." />
+      ) : !isPatronLinked ? (
         <EmptyState
           icon={<AlertCircle className="w-8 h-8 text-amber-500" />}
           title="Institutional Membership Pending"

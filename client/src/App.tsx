@@ -8,7 +8,6 @@ import { CirculationProvider } from './features/circulation/CirculationContext';
 import { ReservationsProvider } from './features/reservations/ReservationsContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { DashboardLayout } from './layouts/DashboardLayout';
-import { DesignSystemPage } from './pages/DesignSystemPage';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
@@ -51,7 +50,6 @@ import {
   Globe,
   LogIn,
   KeyRound,
-  Palette,
   Shield,
   BookOpen,
   User,
@@ -114,7 +112,7 @@ const PLACEHOLDER_MODULES_MAP: Record<
     category: 'Administration',
     phase: 'Phase 15',
     desc: 'Circulation staff assignments, desk duty schedules, and operational permissions.',
-    features: ['Desk terminal binding', 'Shift roster allocation', 'Privileged action logging', 'Staff activity metrics'],
+    features: ['Desk station binding', 'Shift roster allocation', 'Privileged action logging', 'Staff activity metrics'],
   },
   'admin/users': {
     name: 'User Management & RBAC Roles',
@@ -143,7 +141,7 @@ const PLACEHOLDER_MODULES_MAP: Record<
     name: 'Circulation Counter — Issue Copy',
     category: 'Circulation Desk',
     phase: 'Phase 8',
-    desc: 'Fast barcode scanning checkout terminal with smartcard student ID verification.',
+    desc: 'Fast barcode scanning checkout desk with smartcard student ID verification.',
     features: ['High-speed scanner mode', 'Patron quota check', 'Automated due stamp', 'Digital receipt generation'],
   },
   'librarian/circulation/return': {
@@ -193,13 +191,13 @@ const PLACEHOLDER_MODULES_MAP: Record<
     category: 'Reports',
     phase: 'Phase 12',
     desc: 'Shift-by-shift summary of total checkouts, returns, fines collected, and items shelved.',
-    features: ['Shift checkout counter', 'Return punctuality stats', 'Terminal transaction log', 'Handover notes'],
+    features: ['Shift checkout counter', 'Return punctuality stats', 'Counter transaction log', 'Handover notes'],
   },
   'librarian/settings/profile': {
     name: 'Librarian Profile',
     category: 'Settings',
     phase: 'Phase 15',
-    desc: 'Manage staff credentials, assigned terminal station, and display preferences.',
+    desc: 'Manage staff credentials, assigned counter station, and display preferences.',
     features: ['Staff badge info', 'Default counter station', 'Barcode scanner profile', 'Notification sound'],
   },
   'librarian/settings/preferences': {
@@ -311,22 +309,6 @@ function AppContent() {
     }
     if (pathOnly === 'reset-password') {
       return <ResetPasswordPage onNavigate={navigateTo} />;
-    }
-
-    // 2. Design System Showcase
-    if (pathOnly === 'design-system') {
-      return (
-        <DashboardLayout
-          currentPath="design-system"
-          onNavigate={navigateTo}
-          breadcrumbs={[
-            { label: 'LIBFLOW OS' },
-            { label: 'Design System Showcase' },
-          ]}
-        >
-          <DesignSystemPage />
-        </DashboardLayout>
-      );
     }
 
     if (pathOnly === 'dashboard-preview') {
@@ -1711,17 +1693,6 @@ function AppContent() {
 
               <button
                 type="button"
-                onClick={() => navigateTo('design-system')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-left transition-colors ${
-                  pathOnly === 'design-system' ? 'bg-brand text-brand-foreground font-medium' : 'hover:bg-canvas-subtle text-canvas-text'
-                }`}
-              >
-                <Palette className="w-3.5 h-3.5" />
-                <span>Design System Tokens</span>
-              </button>
-
-              <button
-                type="button"
                 onClick={() => navigateTo('forgot-password')}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-left transition-colors ${
                   pathOnly === 'forgot-password' ? 'bg-brand text-brand-foreground font-medium' : 'hover:bg-canvas-subtle text-canvas-text'
@@ -1748,7 +1719,6 @@ function AppContent() {
               {pathOnly === 'admin/dashboard' && 'Admin'}
               {pathOnly === 'librarian/dashboard' && 'Librarian'}
               {pathOnly === 'member/dashboard' && 'Member'}
-              {pathOnly === 'design-system' && 'Tokens'}
             </span>
             <span className="text-[10px] px-1.5 py-0.2 rounded bg-brand/10 text-brand font-bold uppercase">
               {role || 'GUEST'}

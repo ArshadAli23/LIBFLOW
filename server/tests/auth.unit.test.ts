@@ -21,7 +21,7 @@ import {
   validateChangePasswordInput,
 } from '../src/middleware/validation.js';
 import { createLoginRateLimiter, resetRateLimiter } from '../src/middleware/rateLimiter.js';
-import { validateOrigin, isAllowedOrigin } from '../src/middleware/csrf.js';
+import { validateOrigin, isAllowedOrigin, csrfProtection, CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from '../src/middleware/csrf.js';
 import { ApiError } from '../src/utils/ApiError.js';
 import type { Request, Response, NextFunction } from 'express';
 
@@ -249,4 +249,107 @@ describe('Authentication Unit Tests — CSRF & Origin Validation', () => {
     const isValid = validateOrigin(trustedReq);
     assert.equal(isValid, true, 'Configured client origin must be accepted');
   });
+
+  it('csrfProtection allows safe HTTP methods without origin or token checks', () => {
+    for (const method of ['GET', 'HEAD', 'OPTIONS']) {
+      let nextCalled = false;
+      const req = {
+        method,
+        headers: {},
+        cookies: {},
+      } as unknown as Request;
+
+      csrfProtection(req, {} as Response, ((err?: any) => {
+        assert.equal(err, undefined);
+        nextCalled = true;
+      }) as NextFunction);
+
+      assert.equal(nextCalled, true, `Method ${method} must be exempt from CSRF checks`);
+    }
+  });
+
+  it('csrfProtection blocks state-changing request from untrusted origin', () => {
+    let capturedError: any = null;
+    const req = {
+      method: 'POST',
+      headers: {
+        origin: 'https://evil-attacker.com',
+      },
+      cookies: {},
+    } as unknown as Request;
+
+    csrfProtection(req, {} as Response, ((err?: any) => {
+      capturedError = err;
+    }) as NextFunction);
+
+    assert.ok(capturedError instanceof ApiError);
+    assert.equal(capturedError.statusCode, 403);
+    assert.equal(capturedError.errorCode, 'CSRF_ORIGIN_REJECTED');
+  });
+
+  it('csrfProtection rejects state-changing request if csrf cookie is present but header is missing', () => {
+    let capturedError: any = null;
+    const req = {
+      method: 'POST',
+      headers: {
+        origin: 'http://localhost:5173',
+      },
+      cookies: {
+        [CSRF_COOKIE_NAME]: 'valid_csrf_cookie_123',
+      },
+    } as unknown as Request;
+
+    csrfProtection(req, {} as Response, ((err?: any) => {
+      capturedError = err;
+    }) as NextFunction);
+
+    assert.ok(capturedError instanceof ApiError);
+    assert.equal(capturedError.statusCode, 403);
+    assert.equal(capturedError.errorCode, 'CSRF_TOKEN_MISMATCH');
+  });
+
+  it('csrfProtection rejects state-changing request if csrf cookie and header mismatch', () => {
+    let capturedError: any = null;
+    const req = {
+      method: 'POST',
+      headers: {
+        origin: 'http://localhost:5173',
+        [CSRF_HEADER_NAME]: 'forged_csrf_header_456',
+      },
+      cookies: {
+        [CSRF_COOKIE_NAME]: 'valid_csrf_cookie_123',
+      },
+    } as unknown as Request;
+
+    csrfProtection(req, {} as Response, ((err?: any) => {
+      capturedError = err;
+    }) as NextFunction);
+
+    assert.ok(capturedError instanceof ApiError);
+    assert.equal(capturedError.statusCode, 403);
+    assert.equal(capturedError.errorCode, 'CSRF_TOKEN_MISMATCH');
+  });
+
+  it('csrfProtection permits state-changing request when csrf cookie and header match', () => {
+    let nextCalled = false;
+    const token = 'legitimate_csrf_token_xyz_789';
+    const req = {
+      method: 'POST',
+      headers: {
+        origin: 'http://localhost:5173',
+        [CSRF_HEADER_NAME]: token,
+      },
+      cookies: {
+        [CSRF_COOKIE_NAME]: token,
+      },
+    } as unknown as Request;
+
+    csrfProtection(req, {} as Response, ((err?: any) => {
+      assert.equal(err, undefined);
+      nextCalled = true;
+    }) as NextFunction);
+
+    assert.equal(nextCalled, true, 'Request with matching double-submit CSRF tokens must succeed');
+  });
 });
+

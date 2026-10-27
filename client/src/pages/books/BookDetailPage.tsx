@@ -5,7 +5,7 @@
  * availability breakdown, physical copy inventory table, and lifecycle history.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   Edit3,
@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Shield,
   Tag,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useBooks } from '../../features/books/BooksContext';
@@ -34,6 +35,7 @@ import { LoanTable } from '../../features/circulation/components/LoanTable';
 import { ReservationTable } from '../../features/reservations/components/ReservationTable';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/data-display/Cards';
+import { Alert, Spinner } from '../../components/feedback/FeedbackStates';
 import type { BookCopy } from '../../features/books/types';
 
 export interface BookDetailPageProps {
@@ -47,18 +49,47 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
   initialTab = 'overview',
   onNavigate,
 }) => {
-  const { role } = useAuth();
-  const { getBookById, getCopiesForBook, addBookCopy, withdrawBookCopy } = useBooks();
+  const { role, authMode } = useAuth();
+  const {
+    getBookById,
+    getCopiesForBook,
+    fetchBookById,
+    fetchCopiesForBook,
+    addBookCopy,
+    withdrawBookCopy,
+  } = useBooks();
   const { getLoansForBook } = useCirculation();
-  const { getReservationsForBook } = useReservations();
+  const { getReservationsForBook, fetchReservations } = useReservations();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'copies' | 'history' | 'reservations' | 'audit'>(initialTab);
+  const [isLoadingDetail, setIsLoadingDetail] = useState<boolean>(authMode === 'live');
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   // Modals state
   const [isAddCopyOpen, setIsAddCopyOpen] = useState(false);
   const [isReserveModalOpen, setIsReserveModalOpen] = useState(false);
   const [selectedCopyForDetail, setSelectedCopyForDetail] = useState<BookCopy | null>(null);
   const [selectedCopyForWithdraw, setSelectedCopyForWithdraw] = useState<BookCopy | null>(null);
+
+  // LIVE MODE: Fetch book detail and copy inventory from server
+  useEffect(() => {
+    if (authMode === 'live') {
+      setIsLoadingDetail(true);
+      setDetailError(null);
+      Promise.all([
+        fetchBookById(bookId),
+        fetchCopiesForBook(bookId),
+        fetchReservations({ bookId }),
+      ])
+        .then(() => {
+          setIsLoadingDetail(false);
+        })
+        .catch((err) => {
+          setIsLoadingDetail(false);
+          setDetailError(err instanceof Error ? err.message : 'Failed to load book record.');
+        });
+    }
+  }, [authMode, bookId, fetchBookById, fetchCopiesForBook, fetchReservations]);
 
   const book = getBookById(bookId);
   const copies = getCopiesForBook(bookId);
@@ -69,6 +100,61 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
   const isLibrarian = role === 'LIBRARIAN';
   const isMember = role === 'MEMBER';
 
+  const handleBack = () => {
+    if (isAdmin) onNavigate('admin/collection/books');
+    else if (isLibrarian) onNavigate('librarian/collection/books');
+    else onNavigate('member/library/books');
+  };
+
+  if (isLoadingDetail) {
+    return (
+      <div className="py-20 flex flex-col items-center justify-center space-y-3 bg-surface rounded-xl border border-border-subtle shadow-card">
+        <Spinner size="lg" />
+        <span className="text-xs font-mono text-canvas-muted">Loading book accession records...</span>
+      </div>
+    );
+  }
+
+  if (detailError) {
+    return (
+      <div className="space-y-4 py-8">
+        <Alert
+          variant="error"
+          title="Failed to Load Book"
+          description={detailError}
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+              onClick={() => {
+                setIsLoadingDetail(true);
+                setDetailError(null);
+                Promise.all([fetchBookById(bookId), fetchCopiesForBook(bookId)])
+                  .then(() => setIsLoadingDetail(false))
+                  .catch((err) => {
+                    setIsLoadingDetail(false);
+                    setDetailError(err instanceof Error ? err.message : 'Failed to load book record.');
+                  });
+              }}
+              className="text-xs mt-2"
+            >
+              Retry
+            </Button>
+          }
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<ArrowLeft className="w-4 h-4" />}
+          onClick={handleBack}
+        >
+          Return to Catalog
+        </Button>
+      </div>
+    );
+  }
+
   if (!book) {
     return (
       <div className="py-16 text-center space-y-4">
@@ -78,23 +164,13 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
           variant="secondary"
           size="sm"
           leftIcon={<ArrowLeft className="w-4 h-4" />}
-          onClick={() => {
-            if (isAdmin) onNavigate('admin/collection/books');
-            else if (isLibrarian) onNavigate('librarian/collection/books');
-            else onNavigate('member/library/books');
-          }}
+          onClick={handleBack}
         >
           Return to Catalog
         </Button>
       </div>
     );
   }
-
-  const handleBack = () => {
-    if (isAdmin) onNavigate('admin/collection/books');
-    else if (isLibrarian) onNavigate('librarian/collection/books');
-    else onNavigate('member/library/books');
-  };
 
   const handleEdit = () => {
     onNavigate(`admin/collection/books/${book.id}/edit`);
@@ -569,6 +645,12 @@ export const BookDetailPage: React.FC<BookDetailPageProps> = ({
         isOpen={isReserveModalOpen}
         onClose={() => setIsReserveModalOpen(false)}
         book={book}
+        onSuccess={() => {
+          if (authMode === 'live') {
+            fetchBookById(bookId).catch(() => {});
+            fetchReservations({ bookId }).catch(() => {});
+          }
+        }}
       />
       <AddCopyModal
         isOpen={isAddCopyOpen}

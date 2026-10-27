@@ -24,6 +24,7 @@ import { Button } from '../../../components/ui/Button';
 import { BarcodeDisplay } from '../../barcode/components/BarcodeDisplay';
 import { QRCodeDisplay } from '../../barcode/components/QRCodeDisplay';
 import { PrintLabelModal } from '../../barcode/components/PrintLabelModal';
+import { useAuth } from '../../../auth/AuthContext';
 import type { Book, BookCopy } from '../types';
 
 export interface CopyDetailModalProps {
@@ -39,6 +40,8 @@ export const CopyDetailModal: React.FC<CopyDetailModalProps> = ({
   copy,
   book,
 }) => {
+  const { role } = useAuth();
+  const isMember = role === 'MEMBER';
   const [isPrintLabelOpen, setIsPrintLabelOpen] = useState(false);
   if (!copy || !book) return null;
 
@@ -248,26 +251,31 @@ export const CopyDetailModal: React.FC<CopyDetailModalProps> = ({
             </div>
           </div>
 
-          <div className="p-3 rounded-lg border border-border-subtle bg-surface">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-canvas-muted block">
-              Acquisition Cost
-            </span>
-            <div className="flex items-center gap-1 font-mono font-bold text-canvas-text mt-1">
-              <DollarSign className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <span>{copy.acquisitionCost?.toFixed(2) || '49.99'}</span>
+          {!isMember && copy.acquisitionCost !== undefined && (
+            <div className="p-3 rounded-lg border border-border-subtle bg-surface">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-canvas-muted block">
+                Acquisition Cost
+              </span>
+              <div className="flex items-center gap-1 font-mono font-bold text-canvas-text mt-1">
+                <DollarSign className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span>{copy.acquisitionCost.toFixed(2)}</span>
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="p-3 rounded-lg border border-border-subtle bg-surface sm:col-span-2">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-canvas-muted block">
-              Physical Condition & Inscriptions
-            </span>
-            <div className="flex items-center gap-1.5 text-canvas-text mt-1">
-              <FileText className="w-3.5 h-3.5 text-canvas-muted shrink-0" />
-              <span className="truncate">{copy.notes || 'Archival condition. No significant markings.'}</span>
+          {!isMember && copy.notes && (
+            <div className="p-3 rounded-lg border border-border-subtle bg-surface sm:col-span-2">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-canvas-muted block">
+                Staff Physical Notes
+              </span>
+              <div className="flex items-center gap-1.5 text-canvas-text mt-1">
+                <FileText className="w-3.5 h-3.5 text-canvas-muted shrink-0" />
+                <span className="truncate">{copy.notes}</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
+
 
         {/* Lifecycle Audit Timeline */}
         <div className="space-y-3 pt-2">

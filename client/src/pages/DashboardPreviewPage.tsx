@@ -123,7 +123,7 @@ export const DashboardPreviewPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border-subtle pb-6">
         <div>
           <div className="inline-flex items-center gap-1.5 text-xs font-mono text-canvas-muted uppercase tracking-wider mb-1">
-            <span>Terminal: Central Desk 01</span>
+            <span>Circulation Desk: Central Station 01</span>
             <span>•</span>
             <span className="text-emerald-500 font-semibold">Live Operational</span>
           </div>

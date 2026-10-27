@@ -82,12 +82,12 @@ export const csrfProtection = (req: Request, _res: Response, next: NextFunction)
 
   // 3. Double Submit Cookie verification (if client has received a csrf cookie)
   const csrfCookie = req.cookies?.[CSRF_COOKIE_NAME];
-  const csrfHeader = req.headers[CSRF_HEADER_NAME] || req.headers['x-xsrf-token'];
+  const csrfHeader = (req.headers[CSRF_HEADER_NAME] || req.headers['x-xsrf-token']) as string | undefined;
 
-  if (csrfCookie && csrfHeader) {
-    if (csrfCookie !== csrfHeader) {
+  if (csrfCookie) {
+    if (!csrfHeader || csrfCookie !== csrfHeader) {
       return next(
-        ApiError.forbidden('CSRF token mismatch. State-changing request rejected.', 'CSRF_TOKEN_MISMATCH')
+        ApiError.forbidden('CSRF token missing or mismatch. State-changing request rejected.', 'CSRF_TOKEN_MISMATCH')
       );
     }
   }

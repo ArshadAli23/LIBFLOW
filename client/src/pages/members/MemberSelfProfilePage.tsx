@@ -1,8 +1,16 @@
-import React, { useState } from 'react';
+/**
+ * LIBFLOW — Member Self-Profile & Digital Smartcard Page
+ * 
+ * Provides patron self-service inspection of library smartcard,
+ * borrowing quota, reading shelf links, and permitted personal contact editing.
+ * Strictly prevents self-escalation of roles, statuses, quotas, or institutional affiliations.
+ */
+
+import React, { useState, useEffect } from 'react';
 import { MemberStatusBadge, MemberTypeBadge } from '../../features/members/components/MemberStatusBadge';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
-import { FormField, Textarea } from '../../components/forms/FormControls';
+import { FormField, Input } from '../../components/forms/FormControls';
 import { useToast } from '../../context/ToastContext';
 import {
   Mail,
@@ -14,10 +22,14 @@ import {
   ArrowRight,
   ShieldCheck,
   User,
+  Edit3,
+  Lock,
 } from 'lucide-react';
 
 import { useActiveMember } from '../../features/members/useActiveMember';
-import { EmptyState } from '../../components/feedback/FeedbackStates';
+import { useMembers } from '../../features/members/MembersContext';
+import { EmptyState, Spinner, Alert } from '../../components/feedback/FeedbackStates';
+import { ApiClientError } from '../../lib/api/types';
 
 export interface MemberSelfProfilePageProps {
   onNavigate: (path: string) => void;
@@ -25,11 +37,33 @@ export interface MemberSelfProfilePageProps {
 
 export const MemberSelfProfilePage: React.FC<MemberSelfProfilePageProps> = ({ onNavigate }) => {
   const { member } = useActiveMember();
+  const { updateMember, isLoading } = useMembers();
   const { addToast } = useToast();
 
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-  const [updateNotes, setUpdateNotes] = useState('');
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Sync modal inputs when member loads or modal opens
+  useEffect(() => {
+    if (member) {
+      setPhone(member.phone || '');
+      setAddress(member.address || '');
+      setAvatarUrl(member.avatarUrl || '');
+    }
+  }, [member, isUpdateModalOpen]);
+
+  if (isLoading && !member) {
+    return (
+      <div className="py-24 flex flex-col items-center justify-center space-y-3 bg-surface/50 rounded-2xl border border-border-subtle">
+        <Spinner size="lg" />
+        <p className="text-xs text-canvas-muted font-mono">Loading your patron profile & credentials...</p>
+      </div>
+    );
+  }
 
   if (!member) {
     return (
@@ -47,19 +81,44 @@ export const MemberSelfProfilePage: React.FC<MemberSelfProfilePageProps> = ({ on
     );
   }
 
-  const handleRequestUpdate = (e: React.FormEvent) => {
+  const handleUpdateContact = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitted(true);
-    addToast({
-      title: 'Update Request Dispatched',
-      message: 'Your profile amendment ticket was submitted to the library circulation desk.',
-      type: 'success',
-    });
-    setTimeout(() => {
+    if (!phone.trim()) {
+      setApiError('Phone contact number is required.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setApiError(null);
+
+    try {
+      await updateMember(member.id, {
+        phone: phone.trim(),
+        address: address.trim(),
+        avatarUrl: avatarUrl.trim() || undefined,
+      });
+
+      addToast({
+        title: 'Contact Details Updated',
+        message: 'Your personal phone and campus address were successfully updated.',
+        type: 'success',
+      });
+
       setIsUpdateModalOpen(false);
-      setIsSubmitted(false);
-      setUpdateNotes('');
-    }, 500);
+    } catch (err) {
+      const message =
+        err instanceof ApiClientError
+          ? err.message
+          : (err as Error).message || 'Unable to update contact details. Please retry.';
+      setApiError(message);
+      addToast({
+        title: 'Update Failed',
+        message,
+        type: 'error',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -81,11 +140,14 @@ export const MemberSelfProfilePage: React.FC<MemberSelfProfilePageProps> = ({ on
         <Button
           variant="secondary"
           size="sm"
-          leftIcon={<Send className="w-3.5 h-3.5" />}
-          onClick={() => setIsUpdateModalOpen(true)}
+          leftIcon={<Edit3 className="w-3.5 h-3.5" />}
+          onClick={() => {
+            setApiError(null);
+            setIsUpdateModalOpen(true);
+          }}
           className="text-xs self-start sm:self-auto"
         >
-          Request Profile Update
+          Update Contact Info
         </Button>
       </div>
 
@@ -124,7 +186,7 @@ export const MemberSelfProfilePage: React.FC<MemberSelfProfilePageProps> = ({ on
               {member.fullName}
             </h2>
             <p className="text-xs sm:text-sm text-canvas-muted font-medium">
-              {member.academicYear} • {member.program}
+              {member.academicYear ? `${member.academicYear} • ` : ''}{member.program || 'Institutional Member'}
             </p>
             <p className="text-xs font-mono text-brand">
               {member.department}
@@ -218,7 +280,7 @@ export const MemberSelfProfilePage: React.FC<MemberSelfProfilePageProps> = ({ on
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
           <div className="p-3.5 rounded-xl bg-canvas-subtle/50 border border-border-subtle/60 space-y-1">
             <span className="text-[10px] text-canvas-muted uppercase flex items-center gap-1 font-sans">
-              <Mail className="w-3 h-3" /> Email Address
+              <Mail className="w-3 h-3" /> Email Address (Identity Anchor)
             </span>
             <span className="font-semibold text-canvas-text block truncate">{member.email}</span>
           </div>
@@ -227,55 +289,86 @@ export const MemberSelfProfilePage: React.FC<MemberSelfProfilePageProps> = ({ on
             <span className="text-[10px] text-canvas-muted uppercase flex items-center gap-1 font-sans">
               <Phone className="w-3 h-3" /> Phone Contact
             </span>
-            <span className="font-semibold text-canvas-text block">{member.phone}</span>
+            <span className="font-semibold text-canvas-text block">{member.phone || 'Not configured'}</span>
           </div>
 
           <div className="p-3.5 rounded-xl bg-canvas-subtle/50 border border-border-subtle/60 space-y-1 sm:col-span-2">
             <span className="text-[10px] text-canvas-muted uppercase flex items-center gap-1 font-sans">
               <MapPin className="w-3 h-3" /> Campus Residence / Locker
             </span>
-            <span className="font-semibold text-canvas-text block font-sans">{member.address}</span>
+            <span className="font-semibold text-canvas-text block font-sans">{member.address || 'Not configured'}</span>
           </div>
         </div>
       </div>
 
-      {/* Request Profile Update Modal */}
+      {/* Update Contact Details Modal */}
       <Modal
         isOpen={isUpdateModalOpen}
         onClose={() => setIsUpdateModalOpen(false)}
-        title="Request Profile Amendment"
-        description="Submit contact updates or program changes to library staff."
+        title="Update Personal Contact Details"
+        description="Modify your registered phone number and campus residence address."
       >
-        <form onSubmit={handleRequestUpdate} className="space-y-4 text-xs">
-          <div className="p-3.5 rounded-xl bg-canvas-subtle border border-border-subtle text-canvas-muted leading-relaxed">
-            Please describe the changes needed (e.g. updated phone number, change of academic major, or residency change). A circulation administrator will verify and update your record.
+        <form onSubmit={handleUpdateContact} className="space-y-4 text-xs">
+          {apiError && (
+            <Alert
+              variant="error"
+              title="Update Failed"
+              description={apiError}
+            />
+          )}
+
+          {/* Institutional Anchor Notice */}
+          <div className="p-3.5 rounded-xl bg-canvas-subtle border border-border-subtle text-canvas-muted space-y-1 leading-relaxed">
+            <div className="flex items-center gap-1.5 font-semibold text-canvas-text">
+              <Lock className="w-3.5 h-3.5 text-brand" />
+              Institutional Identity Protection
+            </div>
+            <p>
+              Your academic department, degree program, member ID ({member.memberId}), and borrowing quota are managed by university administration. To request program changes, contact the library registrar desk.
+            </p>
           </div>
 
-          <FormField label="Amendment Request Notes" required>
-            <Textarea
-              value={updateNotes}
-              onChange={(e) => setUpdateNotes(e.target.value)}
-              placeholder="e.g. Please update my phone contact to +1 (555) 987-6543 and adjust my major to Computer Systems Engineering..."
-              rows={4}
+          <FormField label="Phone Contact Number" required>
+            <Input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="e.g. +1 (555) 019-2834"
               required
             />
           </FormField>
 
-          <div className="flex items-center justify-end gap-2 pt-2">
+          <FormField label="Campus Residence / Address">
+            <Input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="e.g. East Campus Tower B, Room 402"
+            />
+          </FormField>
+
+          <FormField label="Avatar Image URL (Optional)">
+            <Input
+              value={avatarUrl}
+              onChange={(e) => setAvatarUrl(e.target.value)}
+              placeholder="https://..."
+            />
+          </FormField>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-subtle">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setIsUpdateModalOpen(false)}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
             <Button
               variant="primary"
               size="sm"
-              disabled={isSubmitted || !updateNotes.trim()}
+              disabled={isSubmitting || !phone.trim()}
               leftIcon={<Send className="w-3.5 h-3.5" />}
             >
-              {isSubmitted ? 'Submitting...' : 'Send Request'}
+              {isSubmitting ? 'Saving...' : 'Save Contact Details'}
             </Button>
           </div>
         </form>

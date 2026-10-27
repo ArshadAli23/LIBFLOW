@@ -422,8 +422,13 @@ describe('Authentication API Endpoint Tests (Isolated Mock Fixtures)', () => {
     assert.equal(logoutRes.body.success, true);
 
     // Verify cookie cleared
-    const clearCookies = logoutRes.headers['set-cookie'];
-    const clearedSession = clearCookies?.find((c: string) => c.startsWith(`${env.AUTH.sessionCookieName}=;`));
+    const rawClearCookies = logoutRes.headers['set-cookie'];
+    const clearCookies: string[] = Array.isArray(rawClearCookies)
+      ? rawClearCookies
+      : typeof rawClearCookies === 'string'
+      ? [rawClearCookies]
+      : [];
+    const clearedSession = clearCookies.find((c: string) => c.startsWith(`${env.AUTH.sessionCookieName}=;`));
     assert.ok(clearedSession, 'Session cookie must be cleared on logout');
 
     // 3. Verifying that the logged-out session cookie is rejected

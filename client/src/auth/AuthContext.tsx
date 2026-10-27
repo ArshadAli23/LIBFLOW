@@ -1,100 +1,91 @@
 /**
  * LIBFLOW — Authentication Context & RBAC State Provider
  * 
- * SECURITY NOTICE:
- * Frontend role checks are for navigation and UX only.
- * Server-side authorization and RBAC verification will be implemented in the backend phase.
- * 
- * DEMO AUTHENTICATION:
- * This layer manages demo authentication identities and session persistence for evaluation.
- * Passwords, tokens, and server sessions are mock simulations and must be enforced by
- * a secure backend API in production.
+ * CORE CONTRACT:
+ * - Supports dual authentication modes:
+ *   1. 'demo': static mock accounts for standalone portfolio evaluation (default)
+ *   2. 'live': real Express + MySQL authentication using HttpOnly session cookies
+ * - Governed by VITE_AUTH_MODE ('demo' | 'live')
+ * - On startup in live mode, checks server session via GET /api/v1/auth/me
+ * - Zero access tokens, passwords, or session cookies stored in localStorage/sessionStorage
+ * - Does NOT silently fall back to mock accounts on backend failure
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { User, UserRole, AuthContextType } from './types';
-import { DEMO_USERS } from './mockAuth';
-import { safeStorageSet } from '../lib/storage';
+import type { User, UserRole, AuthContextType } from './types.ts';
+import { DEMO_USERS } from './mockAuth.ts';
+import { safeStorageSet } from '../lib/storage.ts';
+import { authApi } from '../lib/api/auth.ts';
+import { ApiClientError } from '../lib/api/types.ts';
 
-export const AUTH_STORAGE_KEY = 'libflow_mock_session_v2';
-const LEGACY_STORAGE_KEY = 'libflow_mock_session';
+import {
+  AUTH_STORAGE_KEY,
+  getAuthMode,
+  mapApiUserToUser,
+  parseStoredSession,
+  VALID_ROLES,
+  type StoredSession,
+} from './authUtils.ts';
 
-const VALID_ROLES: UserRole[] = ['ADMIN', 'LIBRARIAN', 'MEMBER'];
-const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
-
-export interface StoredSession {
-  isLoggedIn: boolean;
-  role?: UserRole;
-  userId?: string;
-  email?: string;
-  timestamp: number;
-}
-
-function parseStoredSession(): User | null {
-  try {
-    if (typeof window === 'undefined' || !window.localStorage) {
-      return DEMO_USERS.ADMIN;
-    }
-
-    // 1. Check current schema
-    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
-    if (raw) {
-      try {
-        const session = JSON.parse(raw) as StoredSession;
-        // Explicitly logged out session
-        if (session.isLoggedIn === false) {
-          return null;
-        }
-
-        // Validate session expiration
-        if (!session.timestamp || Date.now() - session.timestamp > SESSION_MAX_AGE_MS) {
-          console.warn('[Security Guard] Stored session has expired. Clearing session.');
-          window.localStorage.removeItem(AUTH_STORAGE_KEY);
-          return null;
-        }
-
-        // Validate role integrity
-        if (session.role && VALID_ROLES.includes(session.role) && DEMO_USERS[session.role]) {
-          return DEMO_USERS[session.role];
-        }
-
-        // Invalid or corrupt role payload
-        console.warn('[Security Guard] Corrupt session role detected. Rejecting session.');
-        window.localStorage.removeItem(AUTH_STORAGE_KEY);
-        return null;
-      } catch {
-        // Malformed JSON
-        console.warn('[Security Guard] Malformed JSON in session storage. Discarding.');
-        window.localStorage.removeItem(AUTH_STORAGE_KEY);
-        return null;
-      }
-    }
-
-    // 2. Check legacy key migration
-    const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (legacy) {
-      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
-      if (VALID_ROLES.includes(legacy as UserRole) && DEMO_USERS[legacy as UserRole]) {
-        return DEMO_USERS[legacy as UserRole];
-      }
-    }
-
-    // 3. First-run evaluation default: ADMIN for reviewer evaluation
-    return DEMO_USERS.ADMIN;
-  } catch {
-    return DEMO_USERS.ADMIN;
-  }
-}
+export {
+  AUTH_STORAGE_KEY,
+  getAuthMode,
+  mapApiUserToUser,
+  parseStoredSession,
+  type StoredSession,
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(() => parseStoredSession());
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const authMode = getAuthMode();
 
-  // Sync active user state to secure storage
+  // In live mode, initial user state is null and must be resolved from the server.
+  // In demo mode, initial user state is restored from local storage.
+  const [user, setUser] = useState<User | null>(() => {
+    if (authMode === 'live') {
+      return null;
+    }
+    return parseStoredSession();
+  });
+
+  const [isLoading, setIsLoading] = useState<boolean>(() => authMode === 'live');
+
+  // LIVE MODE: Restore session from MySQL through HttpOnly cookie on mount
   useEffect(() => {
-    if (user) {
+    if (authMode === 'live') {
+      let isMounted = true;
+      setIsLoading(true);
+
+      authApi.getMe()
+        .then((res) => {
+          if (!isMounted) return;
+          if (res.success && res.data?.user) {
+            setUser(mapApiUserToUser(res.data.user, res.data.memberProfile));
+          } else {
+            setUser(null);
+          }
+        })
+        .catch(() => {
+          if (!isMounted) return;
+          // Session expired, invalid, or server offline
+          setUser(null);
+        })
+        .finally(() => {
+          if (isMounted) {
+            setIsLoading(false);
+          }
+        });
+
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [authMode]);
+
+  // DEMO MODE ONLY: Sync active user state to storage
+  useEffect(() => {
+    if (authMode === 'demo' && user) {
       safeStorageSet<StoredSession>(AUTH_STORAGE_KEY, {
         isLoggedIn: true,
         role: user.role,
@@ -103,11 +94,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         timestamp: Date.now(),
       });
     }
-  }, [user]);
+  }, [authMode, user]);
 
   const login = useCallback(
-    async (emailOrRole: string): Promise<{ success: boolean; role?: UserRole; error?: string }> => {
+    async (emailOrRole: string, password?: string): Promise<{ success: boolean; role?: UserRole; error?: string }> => {
       setIsLoading(true);
+
+      // =====================================================================
+      // 1. LIVE MODE: Authenticate with Express + MySQL API
+      // =====================================================================
+      if (authMode === 'live') {
+        try {
+          const res = await authApi.login({
+            email: (emailOrRole || '').trim(),
+            password: password || '',
+          });
+
+          if (res.success && res.data?.user) {
+            const liveUser = mapApiUserToUser(res.data.user, res.data.memberProfile);
+            setUser(liveUser);
+            setIsLoading(false);
+            return { success: true, role: liveUser.role };
+          }
+
+          setIsLoading(false);
+          return { success: false, error: res.message || 'Login failed.' };
+        } catch (err: unknown) {
+          setIsLoading(false);
+          let errorMsg = 'Failed to authenticate with backend server.';
+          if (err instanceof ApiClientError) {
+            if (err.statusCode === 401) {
+              errorMsg = err.message || 'Invalid institutional email or password.';
+            } else if (err.isNetworkError) {
+              errorMsg = 'Backend connection refused. Ensure the LIBFLOW API server is running on port 5000.';
+            } else {
+              errorMsg = err.message || `Server error (${err.statusCode})`;
+            }
+          } else if (err instanceof Error) {
+            errorMsg = err.message;
+          }
+          return { success: false, error: errorMsg };
+        }
+      }
+
+      // =====================================================================
+      // 2. DEMO MODE: Static mock reviewer simulation
+      // =====================================================================
       await new Promise((resolve) => setTimeout(resolve, 350));
 
       const normalized = (emailOrRole || '').trim().toLowerCase();
@@ -146,31 +178,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         error: 'Unrecognized institutional identifier. Use admin@libflow.demo, librarian@libflow.demo, or member@libflow.demo',
       };
     },
-    []
+    [authMode]
   );
 
-  const logout = useCallback(() => {
-    setUser(null);
-    // Explicitly record logged out state so page reload does not resurrect mock session
-    safeStorageSet<StoredSession>(AUTH_STORAGE_KEY, {
-      isLoggedIn: false,
-      timestamp: Date.now(),
-    });
-  }, []);
-
-  const switchDemoRole = useCallback((newRole: UserRole) => {
-    if (VALID_ROLES.includes(newRole) && DEMO_USERS[newRole]) {
-      const targetUser = DEMO_USERS[newRole];
-      setUser(targetUser);
+  const logout = useCallback(async () => {
+    if (authMode === 'live') {
+      setIsLoading(true);
+      try {
+        await authApi.logout();
+      } catch (err) {
+        console.warn('[Live Auth] Remote logout warning:', err);
+      } finally {
+        setUser(null);
+        setIsLoading(false);
+      }
+    } else {
+      setUser(null);
       safeStorageSet<StoredSession>(AUTH_STORAGE_KEY, {
-        isLoggedIn: true,
-        role: newRole,
-        userId: targetUser.id,
-        email: targetUser.email,
+        isLoggedIn: false,
         timestamp: Date.now(),
       });
     }
-  }, []);
+  }, [authMode]);
+
+  const switchDemoRole = useCallback(
+    (newRole: UserRole) => {
+      if (authMode === 'live') {
+        console.warn('[Security Guard] Demo role switching is disabled in live authentication mode. Role is governed by database session.');
+        return;
+      }
+      if (VALID_ROLES.includes(newRole) && DEMO_USERS[newRole]) {
+        const targetUser = DEMO_USERS[newRole];
+        setUser(targetUser);
+        safeStorageSet<StoredSession>(AUTH_STORAGE_KEY, {
+          isLoggedIn: true,
+          role: newRole,
+          userId: targetUser.id,
+          email: targetUser.email,
+          timestamp: Date.now(),
+        });
+      }
+    },
+    [authMode]
+  );
 
   const hasRole = useCallback(
     (allowedRoles: UserRole[]): boolean => {
@@ -185,6 +235,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     role: user?.role ?? null,
     isAuthenticated: !!user,
     isLoading,
+    authMode,
     login,
     logout,
     hasRole,

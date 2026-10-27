@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import mysql from 'mysql2/promise';
 import { env } from '../src/config/env.js';
-import { getPool } from '../src/config/database.js';
+import { getPool, disconnectDatabase } from '../src/config/database.js';
 import { BookService } from '../src/services/BookService.js';
 import { BookCopyService } from '../src/services/BookCopyService.js';
 import { MemberService } from '../src/services/MemberService.js';
@@ -76,6 +76,20 @@ describe('Live MySQL Books, Copies & Members Integration Tests', async () => {
   const member1UserId = `usr_test_patron1_${testRunId}`;
   const member2UserId = `usr_test_patron2_${testRunId}`;
 
+  before(async () => {
+    const pool = getPool();
+    await pool.query(
+      `INSERT INTO users (id, tenant_id, email, password_hash, role, full_name, is_active)
+       VALUES (?, ?, ?, 'test_hash', 'MEMBER', ?, 1)`,
+      [member1UserId, tenantId, `user1.${testRunId}@libflow.io`, 'Rosalind Franklin']
+    );
+    await pool.query(
+      `INSERT INTO users (id, tenant_id, email, password_hash, role, full_name, is_active)
+       VALUES (?, ?, ?, 'test_hash', 'MEMBER', ?, 1)`,
+      [member2UserId, tenantId, `user2.${testRunId}@libflow.io`, 'Grace Hopper']
+    );
+  });
+
   after(async () => {
     // Clean up test data
     try {
@@ -95,9 +109,12 @@ describe('Live MySQL Books, Copies & Members Integration Tests', async () => {
           member2Id || '',
         ]);
       }
+      await pool.query('DELETE FROM users WHERE id IN (?, ?)', [member1UserId, member2UserId]);
       await pool.query("DELETE FROM audit_logs WHERE actor_id LIKE '%test%'");
     } catch (cleanupErr) {
       console.warn('Test cleanup warning:', cleanupErr);
+    } finally {
+      await disconnectDatabase();
     }
   });
 
@@ -302,7 +319,7 @@ describe('Live MySQL Books, Copies & Members Integration Tests', async () => {
       (err: any) => {
         assert.ok(err instanceof ApiError);
         assert.strictEqual(err.statusCode, 400);
-        assert.strictEqual(err.errorCode, 'CIRCULATION_BYPASS_DISALLOWED');
+        assert.strictEqual(err.errorCode, 'CIRCULATION_BYPASS_PROHIBITED');
         return true;
       }
     );

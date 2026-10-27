@@ -11,9 +11,9 @@
     "start": "node dist/server.js",
     "migrate": "tsx src/db/migrator.ts migrate",
     "migrate:status": "tsx src/db/migrator.ts status",
-    "test": "tsx --test tests/database.unit.test.ts tests/domain.unit.test.ts tests/health.test.mjs tests/auth.unit.test.ts tests/rbac.unit.test.ts tests/auth.api.test.ts tests/books_members.unit.test.ts tests/mysql.integration.test.ts tests/mysql.auth.integration.test.ts tests/mysql.books_members.integration.test.ts",
-    "test:unit": "tsx --test tests/database.unit.test.ts tests/domain.unit.test.ts tests/health.test.mjs tests/auth.unit.test.ts tests/rbac.unit.test.ts tests/auth.api.test.ts tests/books_members.unit.test.ts",
-    "test:integration": "tsx --test tests/mysql.integration.test.ts tests/mysql.auth.integration.test.ts tests/mysql.books_members.integration.test.ts"
+    "test": "tsx --test tests/database.unit.test.ts tests/domain.unit.test.ts tests/health.test.mjs tests/auth.unit.test.ts tests/rbac.unit.test.ts tests/auth.api.test.ts tests/books_members.unit.test.ts tests/circulation.unit.test.ts tests/phase17_6.unit.test.ts tests/mysql.integration.test.ts tests/mysql.auth.integration.test.ts tests/mysql.books_members.integration.test.ts tests/mysql.circulation.integration.test.ts tests/mysql.notifications_analytics_barcodes.integration.test.ts",
+    "test:unit": "tsx --test tests/database.unit.test.ts tests/domain.unit.test.ts tests/health.test.mjs tests/auth.unit.test.ts tests/rbac.unit.test.ts tests/auth.api.test.ts tests/books_members.unit.test.ts tests/circulation.unit.test.ts tests/phase17_6.unit.test.ts",
+    "test:integration": "tsx --test tests/mysql.integration.test.ts tests/mysql.auth.integration.test.ts tests/mysql.books_members.integration.test.ts tests/mysql.circulation.integration.test.ts tests/mysql.notifications_analytics_barcodes.integration.test.ts"
   },
   "keywords": [
     "libflow",

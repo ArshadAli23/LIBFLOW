@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { ArrowRight, CheckCircle2, Lock, ArrowLeft } from 'lucide-react';
-import { FormField, PasswordInput } from '../forms/FormControls';
+import { ArrowRight, CheckCircle2, Lock, ArrowLeft, KeyRound } from 'lucide-react';
+import { FormField, Input, PasswordInput } from '../forms/FormControls';
 import { Button } from '../ui/Button';
 import { Alert } from '../feedback/FeedbackStates';
 import { PasswordRequirements } from './PasswordRequirements';
+import { useAuth } from '../../auth/AuthContext';
+import { authApi } from '../../lib/api/auth';
+import { ApiClientError } from '../../lib/api/types';
 
 export interface ResetPasswordFormProps {
   onBackToLogin: () => void;
@@ -14,9 +17,16 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({
   onBackToLogin,
   onSuccessReset,
 }) => {
+  const { authMode } = useAuth();
+  const [token, setToken] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search).get('token') || '';
+    }
+    return '';
+  });
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [errors, setErrors] = useState<{ newPassword?: string; confirmPassword?: string }>({});
+  const [errors, setErrors] = useState<{ newPassword?: string; confirmPassword?: string; token?: string }>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -27,11 +37,11 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({
     /[0-9]/.test(newPassword) &&
     /[^A-Za-z0-9]/.test(newPassword);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
-    const newErrors: { newPassword?: string; confirmPassword?: string } = {};
+    const newErrors: { newPassword?: string; confirmPassword?: string; token?: string } = {};
 
     if (!newPassword) {
       newErrors.newPassword = 'New password is required.';
@@ -45,6 +55,10 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({
       newErrors.confirmPassword = 'Passwords do not match.';
     }
 
+    if (authMode === 'live' && !token.trim()) {
+      newErrors.token = 'Password recovery token is required.';
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -53,11 +67,32 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({
     setErrors({});
     setIsLoading(true);
 
-    // Simulate password rotation
-    setTimeout(() => {
-      setIsLoading(false);
-      setIsSuccess(true);
-    }, 900);
+    if (authMode === 'live') {
+      try {
+        await authApi.resetPassword({
+          token: token.trim(),
+          newPassword,
+          confirmPassword,
+        });
+        setIsLoading(false);
+        setIsSuccess(true);
+      } catch (err: unknown) {
+        setIsLoading(false);
+        let msg = 'Failed to reset password. The recovery link may be expired or invalid.';
+        if (err instanceof ApiClientError) {
+          msg = err.message;
+        } else if (err instanceof Error) {
+          msg = err.message;
+        }
+        setFormError(msg);
+      }
+    } else {
+      // Simulate password rotation in demo mode
+      setTimeout(() => {
+        setIsLoading(false);
+        setIsSuccess(true);
+      }, 900);
+    }
   };
 
   return (
@@ -100,6 +135,26 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({
               description={formError}
               onClose={() => setFormError(null)}
             />
+          )}
+
+          {/* Recovery Token Field (shown in live mode) */}
+          {authMode === 'live' && (
+            <FormField
+              label="Recovery Token"
+              description="Enter the cryptographic token from your recovery link"
+              error={errors.token}
+              required
+            >
+              <Input
+                type="text"
+                placeholder="e.g. rst_..."
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                disabled={isLoading}
+                leftIcon={<KeyRound className="w-4 h-4" />}
+                hasError={!!errors.token}
+              />
+            </FormField>
           )}
 
           {/* New Password */}

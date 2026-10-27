@@ -13,6 +13,7 @@ import { BookCover } from '../../features/books/components/BookCover';
 import { FormField, Input, Textarea, Select } from '../../components/forms/FormControls';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/data-display/Cards';
+import { Alert } from '../../components/feedback/FeedbackStates';
 import type { BookFormat } from '../../features/books/types';
 
 export interface AddBookPageProps {
@@ -54,6 +55,7 @@ export const AddBookPage: React.FC<AddBookPageProps> = ({ onNavigate }) => {
   // Errors state
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -71,7 +73,8 @@ export const AddBookPage: React.FC<AddBookPageProps> = ({ onNavigate }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSave = (addCopiesImmediately: boolean = false) => {
+  const handleSave = async (addCopiesImmediately: boolean = false) => {
+    setSubmitError(null);
     if (!validate()) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -89,40 +92,58 @@ export const AddBookPage: React.FC<AddBookPageProps> = ({ onNavigate }) => {
       .map((t) => t.trim().replace(/^#/, ''))
       .filter(Boolean);
 
-    const createdBook = addBook({
-      title: title.trim(),
-      subtitle: subtitle.trim() || undefined,
-      authors: authorList,
-      isbn: isbn.trim(),
-      publisher: publisher.trim(),
-      publicationYear: parseInt(publicationYear, 10) || 2026,
-      edition: edition.trim() || '1st Edition',
-      language: language.trim() || 'English',
-      format,
-      category: category.trim(),
-      subcategory: subcategory.trim() || undefined,
-      tags: tagList,
-      description: description.trim(),
-      coverUrl: coverUrl.trim() || undefined,
-      subject: subject.trim() || undefined,
-      callNumber: callNumber.trim() || undefined,
-      deweyDecimal: deweyDecimal.trim() || undefined,
-      status: 'ACTIVE',
-      updatedBy: user?.name || 'Administrator',
-    });
+    try {
+      const createdBook = await addBook({
+        title: title.trim(),
+        subtitle: subtitle.trim() || undefined,
+        authors: authorList,
+        isbn: isbn.trim(),
+        publisher: publisher.trim(),
+        publicationYear: parseInt(publicationYear, 10) || 2026,
+        edition: edition.trim() || '1st Edition',
+        language: language.trim() || 'English',
+        format,
+        category: category.trim(),
+        subcategory: subcategory.trim() || undefined,
+        tags: tagList,
+        description: description.trim(),
+        coverUrl: coverUrl.trim() || undefined,
+        subject: subject.trim() || undefined,
+        callNumber: callNumber.trim() || undefined,
+        deweyDecimal: deweyDecimal.trim() || undefined,
+        status: 'ACTIVE',
+        updatedBy: user?.name || 'Administrator',
+      });
 
-    setIsSubmitting(false);
+      setIsSubmitting(false);
 
-    if (addCopiesImmediately) {
-      onNavigate(`admin/collection/books/${createdBook.id}?tab=copies`);
-    } else {
-      onNavigate(`admin/collection/books/${createdBook.id}`);
+      if (addCopiesImmediately) {
+        onNavigate(`admin/collection/books/${createdBook.id}?tab=copies`);
+      } else {
+        onNavigate(`admin/collection/books/${createdBook.id}`);
+      }
+    } catch (err: unknown) {
+      setIsSubmitting(false);
+      const msg = err instanceof Error ? err.message : 'Failed to create bibliographic record.';
+      setSubmitError(msg);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto animate-in fade-in duration-200">
+      {/* Creation Error Banner */}
+      {submitError && (
+        <Alert
+          variant="error"
+          title="Failed to Create Book"
+          description={submitError}
+          onClose={() => setSubmitError(null)}
+        />
+      )}
+
       {/* Header & Breadcrumb */}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border-subtle">
         <div>
           <button

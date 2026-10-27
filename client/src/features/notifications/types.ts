@@ -16,7 +16,18 @@ export type NotificationType =
   | 'FINE_UPDATED'
   | 'FINE_PAID'
   | 'MEMBERSHIP_EXPIRING'
-  | 'SYSTEM_BROADCAST';
+  | 'SYSTEM_BROADCAST'
+  | 'BOOK_ISSUED'
+  | 'GENERAL'
+  | 'LOAN_ISSUED'
+  | 'LOAN_RETURNED'
+  | 'LOAN_RENEWED'
+  | 'DUE_DATE_REMINDER'
+  | 'OVERDUE_ALERT'
+  | 'RESERVATION_CONFIRMED'
+  | 'RESERVATION_EXPIRED'
+  | 'FINE_ASSESSED'
+  | 'FINE_WAIVED';
 
 export type NotificationPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
 
@@ -31,6 +42,8 @@ export interface Notification {
   title: string;
   message: string;
   read: boolean;
+  isRead?: boolean;
+  readAt?: string | null;
   createdAt: string;               // ISO Date
   relatedEntityType?: 'BOOK' | 'LOAN' | 'RESERVATION' | 'FINE' | 'MEMBER' | 'SYSTEM';
   relatedEntityId?: string;

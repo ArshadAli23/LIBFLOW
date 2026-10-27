@@ -46,6 +46,13 @@ export const LoanStatusBadge: React.FC<LoanStatusBadgeProps> = ({
       text: 'text-amber-700 dark:text-amber-400',
       border: 'border-amber-500/20',
     },
+    DAMAGED: {
+      label: 'Damaged',
+      icon: <AlertTriangle className="w-3 h-3 text-rose-500 shrink-0" />,
+      bg: 'bg-rose-500/10',
+      text: 'text-rose-700 dark:text-rose-400',
+      border: 'border-rose-500/20',
+    },
   };
 
   const config = configMap[status] || configMap.ACTIVE;

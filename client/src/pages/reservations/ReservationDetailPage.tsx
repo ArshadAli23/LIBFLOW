@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useReservations } from '../../features/reservations/ReservationsContext';
 import { ReservationStatusBadge } from '../../features/reservations/components/ReservationStatusBadge';
 import { BookCover } from '../../features/books/components/BookCover';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/data-display/Cards';
+import { Spinner } from '../../components/feedback/FeedbackStates';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../auth/AuthContext';
 import {
@@ -28,17 +29,46 @@ export const ReservationDetailPage: React.FC<ReservationDetailPageProps> = ({
 }) => {
   const {
     getReservationById,
+    fetchReservationById,
     markReadyForPickup,
     markClaimed,
     cancelReservation,
   } = useReservations();
   const { addToast } = useToast();
-  const { role } = useAuth();
+  const { role, authMode } = useAuth();
   const isAdmin = role === 'ADMIN';
 
   const basePath = isAdmin ? 'admin/reservations' : 'librarian/reservations';
 
   const reservation = getReservationById(reservationId);
+  const [isFetchingRecord, setIsFetchingRecord] = useState<boolean>(!reservation && authMode === 'live');
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+
+  // In live mode, fetch single reservation by ID if not in memory cache
+  useEffect(() => {
+    let isMounted = true;
+    if (!reservation && authMode === 'live') {
+      setIsFetchingRecord(true);
+      fetchReservationById(reservationId)
+        .finally(() => {
+          if (isMounted) setIsFetchingRecord(false);
+        });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [reservation, authMode, reservationId, fetchReservationById]);
+
+  if (isFetchingRecord) {
+    return (
+      <div className="max-w-xl mx-auto py-20 flex flex-col items-center justify-center space-y-3 bg-surface rounded-2xl border border-border-subtle shadow-card text-center">
+        <Spinner size="lg" />
+        <span className="text-xs font-mono text-canvas-muted">
+          Retrieving reservation hold #{reservationId}...
+        </span>
+      </div>
+    );
+  }
 
   if (!reservation) {
     return (
@@ -54,36 +84,69 @@ export const ReservationDetailPage: React.FC<ReservationDetailPageProps> = ({
     );
   }
 
-  const handleMarkReady = () => {
-    const updated = markReadyForPickup(reservation.id, 'Hold Staging Slot H-04');
-    if (updated) {
+  const handleMarkReady = async () => {
+    setActionInProgress('ready');
+    try {
+      const updated = await markReadyForPickup(reservation.id, 'Hold Staging Slot H-04');
+      if (updated) {
+        addToast({
+          title: 'Volume Staged for Pickup',
+          message: `Hold marked ready at ${updated.pickupSlot || 'Counter'}. 48-hour pickup clock activated.`,
+          type: 'success',
+        });
+      }
+    } catch (err: any) {
       addToast({
-        title: 'Volume Staged for Pickup',
-        message: `Hold marked ready at ${updated.pickupSlot}. 48-hour pickup clock activated.`,
-        type: 'success',
+        title: 'Staging Failed',
+        message: err?.message || 'Could not update staging state.',
+        type: 'error',
       });
+    } finally {
+      setActionInProgress(null);
     }
   };
 
-  const handleMarkClaimed = () => {
-    const updated = markClaimed(reservation.id);
-    if (updated) {
+  const handleMarkClaimed = async () => {
+    setActionInProgress('claim');
+    try {
+      const updated = await markClaimed(reservation.id);
+      if (updated) {
+        addToast({
+          title: 'Reservation Claimed',
+          message: 'Patron has collected the staged volume. Active loan created.',
+          type: 'success',
+        });
+      }
+    } catch (err: any) {
       addToast({
-        title: 'Reservation Claimed',
-        message: 'Patron has collected the staged volume.',
-        type: 'success',
+        title: 'Claim Failed',
+        message: err?.message || 'Could not claim reservation.',
+        type: 'error',
       });
+    } finally {
+      setActionInProgress(null);
     }
   };
 
-  const handleCancel = () => {
-    const updated = cancelReservation(reservation.id, 'Cancelled via desk inspection console');
-    if (updated) {
+  const handleCancel = async () => {
+    setActionInProgress('cancel');
+    try {
+      const updated = await cancelReservation(reservation.id, 'Cancelled via desk staff inspection');
+      if (updated) {
+        addToast({
+          title: 'Hold Cancelled',
+          message: 'Reservation removed from active waitlist and queue positions recalculated.',
+          type: 'info',
+        });
+      }
+    } catch (err: any) {
       addToast({
-        title: 'Hold Cancelled',
-        message: 'Reservation removed from active waitlist.',
-        type: 'info',
+        title: 'Cancellation Failed',
+        message: err?.message || 'Could not cancel reservation.',
+        type: 'error',
       });
+    } finally {
+      setActionInProgress(null);
     }
   };
 
@@ -114,6 +177,7 @@ export const ReservationDetailPage: React.FC<ReservationDetailPageProps> = ({
               variant="primary"
               size="sm"
               onClick={handleMarkReady}
+              isLoading={actionInProgress === 'ready'}
               leftIcon={<MapPin className="w-3.5 h-3.5" />}
               className="text-xs"
             >
@@ -126,6 +190,7 @@ export const ReservationDetailPage: React.FC<ReservationDetailPageProps> = ({
               variant="primary"
               size="sm"
               onClick={handleMarkClaimed}
+              isLoading={actionInProgress === 'claim'}
               leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
               className="text-xs"
             >
@@ -139,6 +204,7 @@ export const ReservationDetailPage: React.FC<ReservationDetailPageProps> = ({
               variant="ghost"
               size="sm"
               onClick={handleCancel}
+              isLoading={actionInProgress === 'cancel'}
               leftIcon={<XCircle className="w-3.5 h-3.5 text-rose-500" />}
               className="text-xs text-canvas-muted hover:text-rose-600"
             >

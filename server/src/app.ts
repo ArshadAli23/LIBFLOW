@@ -13,6 +13,12 @@ import healthRouter from './routes/health.routes.js';
 import authRouter from './routes/auth.routes.js';
 import { bookRouter, bookCopyRouter } from './routes/book.routes.js';
 import { memberRouter } from './routes/member.routes.js';
+import { loanRouter } from './routes/loan.routes.js';
+import { reservationRouter } from './routes/reservation.routes.js';
+import { fineRouter } from './routes/fine.routes.js';
+import { notificationRouter } from './routes/notification.routes.js';
+import { analyticsRouter } from './routes/analytics.routes.js';
+import { barcodeRouter } from './routes/barcode.routes.js';
 import { notFoundHandler } from './middleware/notFound.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { ApiResponse } from './utils/ApiResponse.js';
@@ -29,7 +35,7 @@ export const createApp = (): Application => {
       origin: env.CORS_ORIGIN,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token', 'x-csrf-token'],
     })
   );
 
@@ -57,6 +63,12 @@ export const createApp = (): Application => {
   app.use(`${env.API_PREFIX}/books`, bookRouter);
   app.use(`${env.API_PREFIX}/book-copies`, bookCopyRouter);
   app.use(`${env.API_PREFIX}/members`, memberRouter);
+  app.use(`${env.API_PREFIX}/loans`, loanRouter);
+  app.use(`${env.API_PREFIX}/reservations`, reservationRouter);
+  app.use(`${env.API_PREFIX}/fines`, fineRouter);
+  app.use(`${env.API_PREFIX}/notifications`, notificationRouter);
+  app.use(`${env.API_PREFIX}/analytics`, analyticsRouter);
+  app.use(`${env.API_PREFIX}/barcodes`, barcodeRouter);
 
   // 6. Catch-all for Undefined Routes (404)
   app.use(notFoundHandler);

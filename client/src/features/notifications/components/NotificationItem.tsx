@@ -3,6 +3,8 @@ import type { Notification } from '../types';
 import { NotificationBadge } from './NotificationBadge';
 import { BookCover } from '../../books/components/BookCover';
 import { Check, ArrowRight, Trash2 } from 'lucide-react';
+import { useAuth } from '../../../auth/AuthContext';
+import { resolveNotificationRoute } from '../notificationRouting';
 
 export interface NotificationItemProps {
   notification: Notification;
@@ -17,12 +19,14 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   onNavigate,
   onDelete,
 }) => {
+  const { role } = useAuth();
+
   const handleItemClick = () => {
     if (!notification.read) {
       onMarkAsRead(notification.id);
     }
     if (notification.actionRoute && onNavigate) {
-      onNavigate(notification.actionRoute);
+      onNavigate(resolveNotificationRoute(notification.actionRoute, role));
     }
   };
 

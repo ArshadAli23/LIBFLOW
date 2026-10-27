@@ -38,6 +38,7 @@ export interface Reservation {
   claimedAt?: string;             // ISO Date
   cancelledAt?: string;           // ISO Date
   pickupSlot?: string;            // e.g. "Hold Staging Slot H-04"
+  assignedCopyId?: string;        // references BookCopy.id if staged for pickup
   notes?: string;
   updatedAt: string;
 }

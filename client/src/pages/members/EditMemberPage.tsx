@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMembers } from '../../features/members/MembersContext';
 import type { MemberType } from '../../features/members/types';
 import { FormField, Input, Select } from '../../components/forms/FormControls';
@@ -18,20 +18,24 @@ import {
 } from 'lucide-react';
 import { MemberStatusBadge } from '../../features/members/components/MemberStatusBadge';
 
+import { Spinner, Alert } from '../../components/feedback/FeedbackStates';
+import { ApiClientError } from '../../lib/api/types';
+
 export interface EditMemberPageProps {
   memberId: string;
   onNavigate: (path: string) => void;
 }
 
 export const EditMemberPage: React.FC<EditMemberPageProps> = ({ memberId, onNavigate }) => {
-  const { getMemberById, updateMember } = useMembers();
+  const { getMemberById, fetchMemberById, updateMember } = useMembers();
   const { addToast } = useToast();
-  const { role } = useAuth();
+  const { role, authMode } = useAuth();
   const isAdmin = role === 'ADMIN';
 
-  const member = getMemberById(memberId);
+  const [member, setMember] = useState<any>(() => getMemberById(memberId));
+  const [isFetching, setIsFetching] = useState<boolean>(!member && authMode === 'live');
 
-  // Initialize form state
+  // Form State
   const [firstName, setFirstName] = useState(() => member?.firstName || '');
   const [lastName, setLastName] = useState(() => member?.lastName || '');
   const [email, setEmail] = useState(() => member?.email || '');
@@ -46,9 +50,56 @@ export const EditMemberPage: React.FC<EditMemberPageProps> = ({ memberId, onNavi
   );
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [apiError, setApiError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Sync member if fetched or updated
+  useEffect(() => {
+    const cached = getMemberById(memberId);
+    if (cached) {
+      setMember(cached);
+      setFirstName(cached.firstName);
+      setLastName(cached.lastName);
+      setEmail(cached.email);
+      setPhone(cached.phone);
+      setAddress(cached.address);
+      setMemberType(cached.memberType);
+      setDepartment(cached.department);
+      setProgram(cached.program);
+      setAcademicYear(cached.academicYear || 'Year 1');
+      setMembershipExpiryDate(cached.membershipExpiryDate);
+    } else if (authMode === 'live') {
+      setIsFetching(true);
+      fetchMemberById(memberId)
+        .then((m) => {
+          if (m) {
+            setMember(m);
+            setFirstName(m.firstName);
+            setLastName(m.lastName);
+            setEmail(m.email);
+            setPhone(m.phone);
+            setAddress(m.address);
+            setMemberType(m.memberType);
+            setDepartment(m.department);
+            setProgram(m.program);
+            setAcademicYear(m.academicYear || 'Year 1');
+            setMembershipExpiryDate(m.membershipExpiryDate);
+          }
+        })
+        .finally(() => setIsFetching(false));
+    }
+  }, [memberId, authMode, getMemberById, fetchMemberById]);
+
   const basePath = isAdmin ? 'admin/members' : 'librarian/members';
+
+  if (isFetching) {
+    return (
+      <div className="py-24 flex flex-col items-center justify-center space-y-3 bg-surface/50 rounded-2xl border border-border-subtle">
+        <Spinner size="lg" />
+        <p className="text-xs text-canvas-muted font-mono">Loading patron profile details...</p>
+      </div>
+    );
+  }
 
   if (!member) {
     return (
@@ -81,7 +132,7 @@ export const EditMemberPage: React.FC<EditMemberPageProps> = ({ memberId, onNavi
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) {
       addToast({
@@ -93,11 +144,12 @@ export const EditMemberPage: React.FC<EditMemberPageProps> = ({ memberId, onNavi
     }
 
     setIsSubmitting(true);
+    setApiError(null);
+
     try {
-      const updated = updateMember(member.id, {
+      const updated = await updateMember(member.id, {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        email: email.trim(),
         phone: phone.trim(),
         address: address.trim(),
         memberType,
@@ -114,12 +166,18 @@ export const EditMemberPage: React.FC<EditMemberPageProps> = ({ memberId, onNavi
       });
 
       onNavigate(`${basePath}/${member.id}`);
-    } catch {
+    } catch (err) {
+      const message =
+        err instanceof ApiClientError
+          ? err.message
+          : (err as Error).message || 'Could not save member profile changes.';
+      setApiError(message);
       addToast({
         title: 'Update Error',
-        message: 'Could not save member profile changes.',
+        message,
         type: 'error',
       });
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -178,6 +236,15 @@ export const EditMemberPage: React.FC<EditMemberPageProps> = ({ memberId, onNavi
           </Button>
         </div>
       </div>
+
+      {/* Profile Update API Error Banner */}
+      {apiError && (
+        <Alert
+          variant="error"
+          title="Profile Update Failed"
+          description={apiError}
+        />
+      )}
 
       {/* 2-Column Desktop Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">

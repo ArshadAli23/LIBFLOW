@@ -88,7 +88,7 @@ export const PlaceholderModulePage: React.FC<PlaceholderModuleProps> = ({
             Coming in the next LIBFLOW module
           </h4>
           <p className="text-xs text-canvas-muted leading-relaxed">
-            Phase 4 establishes the strict RBAC navigation architecture and operational dashboard shells. This business module will be connected during its scheduled development milestone.
+            Phase 4 establishes the strict RBAC navigation architecture and operational dashboard workflows. This business module will be connected during its scheduled development milestone.
           </p>
         </div>
 

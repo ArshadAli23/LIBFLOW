@@ -1,15 +1,17 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useReservations } from '../../features/reservations/ReservationsContext';
 import { ReservationStatusBadge } from '../../features/reservations/components/ReservationStatusBadge';
 import { BookCover } from '../../features/books/components/BookCover';
 import { Button } from '../../components/ui/Button';
-import { EmptyState } from '../../components/feedback/FeedbackStates';
+import { EmptyState, Alert, Spinner } from '../../components/feedback/FeedbackStates';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../auth/AuthContext';
 import {
   Clock,
   CheckCircle2,
   BookOpen,
   X,
+  RefreshCw,
 } from 'lucide-react';
 
 import { useActiveMember } from '../../features/members/useActiveMember';
@@ -22,8 +24,24 @@ export const MemberReservationsPage: React.FC<MemberReservationsPageProps> = ({
   onNavigate,
 }) => {
   const { memberId, isLinked } = useActiveMember();
-  const { getReservationsForMember, cancelReservation } = useReservations();
+  const { authMode } = useAuth();
+  const {
+    getReservationsForMember,
+    cancelReservation,
+    isLoading,
+    error,
+    clearError,
+    fetchReservations,
+  } = useReservations();
   const { addToast } = useToast();
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  // In live mode, refresh personal holds from server on mount
+  useEffect(() => {
+    if (authMode === 'live') {
+      fetchReservations().catch(() => {});
+    }
+  }, [authMode, fetchReservations]);
 
   const myReservations = useMemo(() => {
     if (!memberId) return [];
@@ -38,14 +56,25 @@ export const MemberReservationsPage: React.FC<MemberReservationsPageProps> = ({
     (r) => r.status === 'CLAIMED' || r.status === 'CANCELLED' || r.status === 'EXPIRED'
   );
 
-  const handleCancelHold = (reservationId: string, title: string) => {
-    const cancelled = cancelReservation(reservationId, 'Cancelled by patron');
-    if (cancelled) {
+  const handleCancelHold = async (reservationId: string, title: string) => {
+    setCancellingId(reservationId);
+    try {
+      const cancelled = await cancelReservation(reservationId, 'Cancelled by patron');
+      if (cancelled) {
+        addToast({
+          title: 'Reservation Cancelled',
+          message: `Your hold on "${title}" has been removed from the queue.`,
+          type: 'info',
+        });
+      }
+    } catch (err: any) {
       addToast({
-        title: 'Reservation Cancelled',
-        message: `Your hold on "${title}" has been removed from the queue.`,
-        type: 'info',
+        title: 'Hold Cancellation Failed',
+        message: err?.message || 'Could not cancel reservation hold.',
+        type: 'error',
       });
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -76,6 +105,27 @@ export const MemberReservationsPage: React.FC<MemberReservationsPageProps> = ({
         </Button>
       </div>
 
+      {/* Error Alert with Retry Action */}
+      {error && (
+        <Alert
+          variant="error"
+          title="Reservation Service Notice"
+          description={error}
+          onClose={clearError}
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => fetchReservations()}
+              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+              className="text-xs mt-2"
+            >
+              Retry
+            </Button>
+          }
+        />
+      )}
+
       {/* Prominent Banner if any hold is READY_FOR_PICKUP (Section 9 Requirement) */}
       {activeHolds.some((r) => r.status === 'READY_FOR_PICKUP') && (
         <div className="p-5 rounded-2xl border-2 border-emerald-500/40 bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-surface text-emerald-900 dark:text-emerald-200 shadow-ambient flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -98,7 +148,9 @@ export const MemberReservationsPage: React.FC<MemberReservationsPageProps> = ({
 
           <div className="px-3.5 py-1.5 rounded-xl bg-surface border border-emerald-500/30 font-mono text-xs text-center self-start sm:self-auto shadow-sm">
             <span className="text-[10px] uppercase text-canvas-muted block">Staging Slot</span>
-            <span className="font-bold text-emerald-600 dark:text-emerald-400">HOLD SLOT H-04</span>
+            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+              {activeHolds.find((r) => r.status === 'READY_FOR_PICKUP')?.pickupSlot || 'HOLD SLOT H-04'}
+            </span>
           </div>
         </div>
       )}
@@ -109,6 +161,12 @@ export const MemberReservationsPage: React.FC<MemberReservationsPageProps> = ({
           <h2 className="text-sm font-mono uppercase tracking-wider text-canvas-muted font-bold">
             Active Waitlist Queue ({activeHolds.length})
           </h2>
+          {isLoading && (
+            <div className="flex items-center gap-1.5 text-xs font-mono text-canvas-muted">
+              <Spinner size="sm" />
+              <span>Updating queue...</span>
+            </div>
+          )}
         </div>
 
         {!isLinked ? (
@@ -117,6 +175,11 @@ export const MemberReservationsPage: React.FC<MemberReservationsPageProps> = ({
             title="Institutional Membership Pending"
             description="Your user account is not currently associated with an active library membership card. Please visit the circulation desk to link your patron profile."
           />
+        ) : isLoading && myReservations.length === 0 ? (
+          <div className="py-16 flex flex-col items-center justify-center space-y-3 bg-surface rounded-2xl border border-border-subtle shadow-card text-center">
+            <Spinner size="md" />
+            <span className="text-xs font-mono text-canvas-muted">Loading your hold queue status...</span>
+          </div>
         ) : activeHolds.length === 0 ? (
           <EmptyState
             icon={<Clock className="w-8 h-8 text-canvas-muted" />}
@@ -188,7 +251,7 @@ export const MemberReservationsPage: React.FC<MemberReservationsPageProps> = ({
                       </span>
                     </div>
                     <span className="text-[11px] text-canvas-muted block">
-                      Staged on: {res.readyAt?.split('T')[0]} • Expires in 48 hours
+                      Staged on: {res.readyAt?.split('T')[0] || 'Today'} • Expires: {res.expiresAt ? new Date(res.expiresAt).toLocaleDateString() : '48 hours'}
                     </span>
                   </div>
                 ) : (
@@ -213,6 +276,7 @@ export const MemberReservationsPage: React.FC<MemberReservationsPageProps> = ({
                     variant="ghost"
                     size="sm"
                     onClick={() => handleCancelHold(res.id, res.bookTitle)}
+                    isLoading={cancellingId === res.id}
                     leftIcon={<X className="w-3.5 h-3.5 text-rose-500" />}
                     className="text-xs text-canvas-muted hover:text-rose-600 dark:hover:text-rose-400"
                   >

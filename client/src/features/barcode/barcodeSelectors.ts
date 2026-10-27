@@ -25,6 +25,8 @@ export interface BarcodeResolutionContext {
 export function normalizeBarcode(input: string): string {
   if (typeof input !== 'string') return '';
   // Strip control characters and cap maximum payload length to 512 characters
+  // oxlint-disable-next-line eslint(no-control-regex)
+  // eslint-disable-next-line no-control-regex
   const sanitized = input.replace(/[\x00-\x1F\x7F]/g, '').trim();
   if (!sanitized || sanitized.length > 512) return '';
 

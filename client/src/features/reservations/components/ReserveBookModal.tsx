@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Book } from '../../books/types';
 import { useReservations } from '../ReservationsContext';
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
 import { BookCover } from '../../books/components/BookCover';
+import { Alert } from '../../../components/feedback/FeedbackStates';
 import { useToast } from '../../../context/ToastContext';
 import { Clock } from 'lucide-react';
 import { useActiveMember } from '../../members/useActiveMember';
@@ -24,6 +25,8 @@ export const ReserveBookModal: React.FC<ReserveBookModalProps> = ({
   const { createReservation, getReservationsForBook } = useReservations();
   const { memberId, isLinked } = useActiveMember();
   const { addToast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   if (!book) return null;
 
@@ -32,8 +35,11 @@ export const ReserveBookModal: React.FC<ReserveBookModalProps> = ({
   );
   const projectedPosition = currentBookHolds.length + 1;
 
-  const handleConfirmReservation = () => {
+  const handleConfirmReservation = async () => {
+    if (isSubmitting) return;
+
     if (!isLinked || !memberId) {
+      setSubmitError('Your account is not linked to an active library membership card. Please visit the circulation desk to activate borrowing and hold privileges.');
       addToast({
         title: 'Membership Verification Required',
         message: 'Your account is not linked to an active library membership card. Please visit the circulation desk to activate borrowing and hold privileges.',
@@ -42,37 +48,71 @@ export const ReserveBookModal: React.FC<ReserveBookModalProps> = ({
       return;
     }
 
-    const result = createReservation({
-      memberId,
-      bookId: book.id,
-    });
+    setSubmitError(null);
+    setIsSubmitting(true);
 
-    if (result.success && result.reservation) {
-      addToast({
-        title: 'Title Reservation Placed',
-        message: `You are #${result.reservation.queuePosition} in line for "${book.title}". You will receive a 48-hour pickup alert once a volume is returned.`,
-        type: 'success',
+    try {
+      const result = await createReservation({
+        memberId,
+        bookId: book.id,
       });
-      onSuccess?.();
-      onClose();
-    } else {
+
+      if (result.success && result.reservation) {
+        addToast({
+          title: 'Title Reservation Placed',
+          message: `You are #${result.reservation.queuePosition} in line for "${book.title}". You will receive a 48-hour pickup alert once a volume is staged.`,
+          type: 'success',
+        });
+        onSuccess?.();
+        onClose();
+      } else {
+        const errorMsg = result.error || 'Could not place reservation on this book.';
+        setSubmitError(errorMsg);
+        addToast({
+          title: 'Hold Placement Failed',
+          message: errorMsg,
+          type: 'error',
+        });
+      }
+    } catch (err: any) {
+      const errorMsg = err?.message || 'An unexpected error occurred while placing your hold.';
+      setSubmitError(errorMsg);
       addToast({
         title: 'Hold Placement Failed',
-        message: result.error || 'Could not place reservation.',
+        message: errorMsg,
         type: 'error',
       });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleModalClose = () => {
+    if (!isSubmitting) {
+      setSubmitError(null);
+      onClose();
     }
   };
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleModalClose}
       title="Place Hold Reservation"
       description="Join the automated circulation waitlist for this title."
       size="md"
     >
       <div className="space-y-4 pt-2">
+        {/* Inline Submission Error (Preserves modal state on failure) */}
+        {submitError && (
+          <Alert
+            variant="error"
+            title="Unable to Place Reservation"
+            description={submitError}
+            onClose={() => setSubmitError(null)}
+          />
+        )}
+
         {/* Book Identity Card */}
         <div className="p-3.5 rounded-xl border border-border-subtle bg-canvas-subtle/50 flex items-center gap-3.5 text-xs">
           <BookCover
@@ -119,7 +159,13 @@ export const ReserveBookModal: React.FC<ReserveBookModalProps> = ({
         </div>
 
         <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border-subtle">
-          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleModalClose}
+            disabled={isSubmitting}
+          >
             Cancel
           </Button>
           <Button
@@ -127,6 +173,7 @@ export const ReserveBookModal: React.FC<ReserveBookModalProps> = ({
             variant="primary"
             size="sm"
             onClick={handleConfirmReservation}
+            isLoading={isSubmitting}
             leftIcon={<Clock className="w-3.5 h-3.5" />}
           >
             Confirm Reservation (#{projectedPosition})

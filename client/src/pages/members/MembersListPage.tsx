@@ -1,10 +1,18 @@
-import React, { useState, useMemo } from 'react';
+/**
+ * LIBFLOW — Members List & Directory Page
+ * 
+ * Supports institutional patron directory search, role filtering,
+ * status changes, server-side pagination, and live/demo modes.
+ */
+
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useMembers } from '../../features/members/MembersContext';
 import type { Member, MemberFilterState, MemberSortOption, MemberStatus } from '../../features/members/types';
 import { MemberTable } from '../../features/members/components/MemberTable';
 import { MemberFilters } from '../../features/members/components/MemberFilters';
 import { ChangeStatusModal } from '../../features/members/components/ChangeStatusModal';
 import { Button } from '../../components/ui/Button';
+import { Alert, Spinner } from '../../components/feedback/FeedbackStates';
 import { useAuth } from '../../auth/AuthContext';
 import {
   Plus,
@@ -12,6 +20,9 @@ import {
   ShieldCheck,
   Clock,
   ShieldAlert,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 export interface MembersListPageProps {
@@ -19,8 +30,16 @@ export interface MembersListPageProps {
 }
 
 export const MembersListPage: React.FC<MembersListPageProps> = ({ onNavigate }) => {
-  const { members, updateMemberStatus } = useMembers();
-  const { role } = useAuth();
+  const {
+    members,
+    updateMemberStatus,
+    isLoading,
+    error,
+    pagination,
+    fetchMembers,
+    clearError,
+  } = useMembers();
+  const { role, authMode } = useAuth();
   const isAdmin = role === 'ADMIN';
 
   // Filters state
@@ -32,6 +51,67 @@ export const MembersListPage: React.FC<MembersListPageProps> = ({ onNavigate }) 
   });
 
   const [sortBy, setSortBy] = useState<MemberSortOption>('name_asc');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  // Debounced search for live mode
+  const [debouncedSearch, setDebouncedSearch] = useState(filterState.search);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(filterState.search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filterState.search]);
+
+  // Reset page to 1 when filters or search change
+  const handleFilterChange = (updates: Partial<MemberFilterState>) => {
+    setCurrentPage(1);
+    setFilterState((prev) => ({ ...prev, ...updates }));
+  };
+
+  // Map frontend sort option to backend whitelist
+  const mapSortOptionToBackend = (option: MemberSortOption): string => {
+    switch (option) {
+      case 'name_asc':
+        return 'name_asc';
+      case 'name_desc':
+        return 'name_desc';
+      case 'member_id_asc':
+        return 'member_id_asc';
+      case 'recent_activity':
+        return 'recently_registered';
+      default:
+        return 'name_asc';
+    }
+  };
+
+  // LIVE MODE: Fetch members when filter, search, sort, or page changes
+  const isFirstMountRef = useRef(true);
+  useEffect(() => {
+    if (authMode === 'live' && (role === 'ADMIN' || role === 'LIBRARIAN')) {
+      if (isFirstMountRef.current) {
+        isFirstMountRef.current = false;
+      }
+      fetchMembers({
+        page: currentPage,
+        limit: 20,
+        search: debouncedSearch.trim() || undefined,
+        status: filterState.status !== 'ALL' ? filterState.status : undefined,
+        memberType: filterState.memberType !== 'ALL' ? filterState.memberType : undefined,
+        department: filterState.department !== 'ALL' ? filterState.department : undefined,
+        sortBy: mapSortOptionToBackend(sortBy),
+      });
+    }
+  }, [
+    authMode,
+    role,
+    currentPage,
+    debouncedSearch,
+    filterState.status,
+    filterState.memberType,
+    filterState.department,
+    sortBy,
+    fetchMembers,
+  ]);
 
   // Change status modal state
   const [selectedMemberForStatus, setSelectedMemberForStatus] = useState<Member | null>(null);
@@ -45,8 +125,12 @@ export const MembersListPage: React.FC<MembersListPageProps> = ({ onNavigate }) 
     return Array.from(set).sort();
   }, [members]);
 
-  // Filtered & sorted members
+  // DEMO MODE: In-memory filtered & sorted members
   const filteredMembers = useMemo(() => {
+    if (authMode === 'live') {
+      return members;
+    }
+
     return members
       .filter((member) => {
         // Search across name, memberId, email
@@ -93,30 +177,44 @@ export const MembersListPage: React.FC<MembersListPageProps> = ({ onNavigate }) 
             return 0;
         }
       });
-  }, [members, filterState, sortBy]);
+  }, [authMode, members, filterState, sortBy]);
 
   // Summary Metrics
   const metrics = useMemo(() => {
-    const total = members.length;
+    const total = authMode === 'live' ? pagination.total || members.length : members.length;
     const active = members.filter((m) => m.status === 'ACTIVE').length;
     const pending = members.filter((m) => m.status === 'PENDING').length;
     const sanction = members.filter(
       (m) => m.status === 'SUSPENDED' || m.status === 'EXPIRED'
     ).length;
 
-    const activePct = total > 0 ? Math.round((active / total) * 100) : 0;
-    const pendingPct = total > 0 ? Math.round((pending / total) * 100) : 0;
-    const sanctionPct = total > 0 ? Math.round((sanction / total) * 100) : 0;
+    const baseCount = members.length || 1;
+    const activePct = total > 0 ? Math.round((active / baseCount) * 100) : 0;
+    const pendingPct = total > 0 ? Math.round((pending / baseCount) * 100) : 0;
+    const sanctionPct = total > 0 ? Math.round((sanction / baseCount) * 100) : 0;
 
     return { total, active, pending, sanction, activePct, pendingPct, sanctionPct };
-  }, [members]);
+  }, [authMode, pagination.total, members]);
 
-  const handleConfirmStatusChange = (
+  const handleConfirmStatusChange = async (
     memberId: string,
     newStatus: MemberStatus,
     reason: string
   ) => {
-    updateMemberStatus(memberId, newStatus, reason);
+    await updateMemberStatus(memberId, newStatus, reason);
+  };
+
+  const handleRetry = () => {
+    clearError();
+    fetchMembers({
+      page: currentPage,
+      limit: 20,
+      search: debouncedSearch.trim() || undefined,
+      status: filterState.status !== 'ALL' ? filterState.status : undefined,
+      memberType: filterState.memberType !== 'ALL' ? filterState.memberType : undefined,
+      department: filterState.department !== 'ALL' ? filterState.department : undefined,
+      sortBy: mapSortOptionToBackend(sortBy),
+    });
   };
 
   const basePath = isAdmin ? 'admin/members' : 'librarian/members';
@@ -138,6 +236,19 @@ export const MembersListPage: React.FC<MembersListPageProps> = ({ onNavigate }) 
         </div>
 
         <div className="flex items-center gap-2.5 self-start md:self-auto">
+          {authMode === 'live' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />}
+              onClick={handleRetry}
+              disabled={isLoading}
+              className="text-xs"
+            >
+              Sync
+            </Button>
+          )}
+
           <Button
             variant="ghost"
             size="sm"
@@ -162,7 +273,21 @@ export const MembersListPage: React.FC<MembersListPageProps> = ({ onNavigate }) 
         </div>
       </div>
 
-      {/* Editorial Asymmetric Hero Composition (Replaces 4 identical cards) */}
+      {/* Error Alert Banner in Live Mode */}
+      {error && (
+        <Alert
+          variant="error"
+          title="Directory Synchronization Error"
+          description={error}
+          action={
+            <Button variant="secondary" size="sm" onClick={handleRetry} leftIcon={<RefreshCw className="w-3.5 h-3.5" />}>
+              Retry Query
+            </Button>
+          }
+        />
+      )}
+
+      {/* Editorial Asymmetric Hero Composition */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Primary Hero Metric Card (7 cols) */}
         <div className="lg:col-span-7 p-6 rounded-2xl border border-border-subtle bg-surface shadow-card flex flex-col justify-between">
@@ -274,25 +399,63 @@ export const MembersListPage: React.FC<MembersListPageProps> = ({ onNavigate }) 
       {/* Filters & Search Component */}
       <MemberFilters
         filterState={filterState}
-        onFilterChange={(updates) => setFilterState((prev) => ({ ...prev, ...updates }))}
-        onResetFilters={() =>
-          setFilterState({ search: '', status: 'ALL', memberType: 'ALL', department: 'ALL' })
-        }
+        onFilterChange={handleFilterChange}
+        onResetFilters={() => {
+          setCurrentPage(1);
+          setFilterState({ search: '', status: 'ALL', memberType: 'ALL', department: 'ALL' });
+        }}
         sortBy={sortBy}
         onSortChange={setSortBy}
         departments={departments}
-        totalResults={filteredMembers.length}
-        totalMembers={members.length}
+        totalResults={authMode === 'live' ? pagination.total : filteredMembers.length}
+        totalMembers={authMode === 'live' ? pagination.total : members.length}
       />
 
-      {/* Enhanced Member Table & Mobile Cards */}
-      <MemberTable
-        members={filteredMembers}
-        onViewMember={(m) => onNavigate(`${basePath}/${m.id}`)}
-        onEditMember={(m) => onNavigate(`${basePath}/${m.id}/edit`)}
-        onChangeStatus={(m) => setSelectedMemberForStatus(m)}
-        canEdit={isAdmin}
-      />
+      {/* Loading state indicator */}
+      {isLoading && filteredMembers.length === 0 ? (
+        <div className="py-20 flex flex-col items-center justify-center space-y-3 bg-surface/50 rounded-2xl border border-border-subtle">
+          <Spinner size="lg" />
+          <p className="text-xs text-canvas-muted font-mono">Querying patron directory records...</p>
+        </div>
+      ) : (
+        /* Enhanced Member Table & Mobile Cards */
+        <MemberTable
+          members={filteredMembers}
+          onViewMember={(m) => onNavigate(`${basePath}/${m.id}`)}
+          onEditMember={(m) => onNavigate(`${basePath}/${m.id}/edit`)}
+          onChangeStatus={(m) => setSelectedMemberForStatus(m)}
+          canEdit={isAdmin}
+        />
+      )}
+
+      {/* Server Pagination Bar in Live Mode */}
+      {authMode === 'live' && pagination.totalPages > 1 && (
+        <div className="flex items-center justify-between pt-4 pb-2 border-t border-border-subtle text-xs">
+          <span className="text-canvas-muted font-mono">
+            Page {pagination.page} of {pagination.totalPages} ({pagination.total} patrons total)
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={pagination.page <= 1 || isLoading}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              leftIcon={<ChevronLeft className="w-3.5 h-3.5" />}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={pagination.page >= pagination.totalPages || isLoading}
+              onClick={() => setCurrentPage((p) => Math.min(pagination.totalPages, p + 1))}
+              rightIcon={<ChevronRight className="w-3.5 h-3.5" />}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Sensitive Status Modal */}
       <ChangeStatusModal

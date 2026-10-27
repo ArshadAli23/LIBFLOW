@@ -55,7 +55,7 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({ onNavigate }) => {
                   onClick={() => onNavigate('dashboard-preview')}
                   className="hover:text-canvas-text transition-colors flex items-center gap-1"
                 >
-                  <span>Interactive Shell</span>
+                  <span>Interactive Dashboard</span>
                   <ArrowUpRight className="w-3 h-3 opacity-60" />
                 </button>
               </li>
@@ -68,16 +68,6 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({ onNavigate }) => {
               Resources
             </h4>
             <ul className="space-y-2 text-xs text-canvas-muted">
-              <li>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('design-system')}
-                  className="hover:text-canvas-text transition-colors flex items-center gap-1"
-                >
-                  <span>Design System Tokens</span>
-                  <ArrowUpRight className="w-3 h-3 opacity-60" />
-                </button>
-              </li>
               <li>
                 <a href="#value" className="hover:text-canvas-text transition-colors">
                   Architecture Specs
